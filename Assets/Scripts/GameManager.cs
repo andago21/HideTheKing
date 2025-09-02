@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using System;
 
 namespace DefaultNamespace
 {
@@ -16,6 +17,9 @@ namespace DefaultNamespace
         private int whitePieces = 16;
         private int blackPieces = 16;
         private string gameStatus = "Ongoing";
+        
+        public event Action<bool> OnPieceCaptured; // true = weiß, false = schwarz
+        public event Action<string> OnGameStatusChanged;
 
         private void Awake()
         {
@@ -29,13 +33,33 @@ namespace DefaultNamespace
         {
             UpdateUI();
         }
-
+        
         public void PieceCaptured(bool isWhite)
         {
             if (isWhite)
                 whitePieces--;
             else
                 blackPieces--;
+            
+            OnPieceCaptured?.Invoke(isWhite);
+            UpdateUI();
+        }
+        
+        public int GetRemainingPieces(bool isWhite)
+        {
+            return isWhite ? whitePieces : blackPieces;
+        }
+
+        public string GetGameStatus()
+        {
+            return gameStatus;
+        }
+
+        public void SetGameStatus(string status)
+        {
+            gameStatus = status;
+
+            OnGameStatusChanged?.Invoke(status);
 
             UpdateUI();
         }
@@ -45,12 +69,6 @@ namespace DefaultNamespace
             whitePiecesText.text = "White Pieces: " + whitePieces;
             blackPiecesText.text = "Black Pieces: " + blackPieces;
             gameStatusText.text = "Status: " + gameStatus;
-        }
-
-        public void SetGameStatus(string status)
-        {
-            gameStatus = status;
-            UpdateUI();
         }
     }
 }

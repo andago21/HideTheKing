@@ -30,9 +30,9 @@ public class BoardManager : MonoBehaviour
         // Bauern
         for (int i = 0; i < 8; i++)
         {
-            Instantiate(whitePawn, squares[8 + i].position, Quaternion.identity, squares[8 + i]);
+            Instantiate(whitePawn, squares[8 + i].position + (Vector3.down * 0.1f), Quaternion.identity, squares[8 + i]);
             
-            Instantiate(blackPawn, squares[48 + i].position, Quaternion.identity, squares[48 + i]);
+            Instantiate(blackPawn, squares[48 + i].position + (Vector3.down * 0.1f), Quaternion.identity, squares[48 + i]);
         }
 
         // Türme

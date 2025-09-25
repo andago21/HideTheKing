@@ -5,9 +5,9 @@ using System.Collections;
 public class PlayerInput : MonoBehaviour
 {
     public BoardManager boardManager;
-    public GameObject highlightPrefab; // Assign in Inspector
-    public GameObject moveEffectPrefab; // Optional: Assign particle prefab
-    public GameObject captureEffectPrefab; // Optional: Assign particle prefab
+    public GameObject highlightPrefab;
+    public GameObject moveEffectPrefab; 
+    public GameObject captureEffectPrefab; 
 
     private Piece selectedPiece;
     private List<GameObject> highlights = new List<GameObject>();
@@ -68,7 +68,7 @@ public class PlayerInput : MonoBehaviour
         foreach (var move in moves)
         {
             int index = move.x * 8 + move.y;
-            Vector3 pos = boardManager.squares[index].position + new Vector3(-0.5f, 0f, +0.5f);
+            Vector3 pos = boardManager.squares[index].position + new Vector3(-0.5f, -0.08f, +0.5f);
             GameObject highlight = Instantiate(highlightPrefab, pos, Quaternion.Euler(0, 0, 0));
             highlights.Add(highlight);
         }

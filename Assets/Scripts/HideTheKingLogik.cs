@@ -2,149 +2,67 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace DefaultNamespace
+namespace HideTheKing.Core
 {
-    public interface IHideTheKingLogic
+    public sealed class HiddenTargetLogicGeneric
     {
-        event Action<GameResult> OnGameOver;
-        void Initialize(NewGameOptions options = null);
-        IReadOnlyList<Move> GetLegalMoves(Square from);
-        bool MakeMove(Move move);
-        bool RevealGuess(Guid pieceId);
-        BoardState Snapshot();
-    }
+        public event Action<bool, string> OnGameOver;
 
-    public sealed class NewGameOptions
-    {
-        public PieceColor? HiddenSide { get; set; }
-        public int? RandomSeed { get; set; }
-    }
+        private Random _rng = new Random();
+        private ChessPiece _hiddenTarget;
+        private bool _hiddenIsWhite;
+        private bool _initialized;
 
-
-    public interface IMoveEngine
-    {
-        void SetupClassic();
-        IReadOnlyList<Move> GetLegalMoves(Square from);
-        MoveResult ApplyMove(Move move);
-        PieceColor SideToMove { get; }
-        IReadOnlyList<PieceView> Pieces { get; }
-        PieceView GetPieceAt(Square square);
-    }
-    
-    public enum PieceColor { White, Black }
-    public enum PieceType { Pawn, Knight, Bishop, Rook, Queen, King }
-    public readonly struct Square
-    {
-        public int File { get; }
-        public int Rank { get; }
-        public Square(int file, int rank) { File = file; Rank = rank; }
-        public override string ToString() => $"{(char)('a' + File)}{Rank + 1}";
-    }
-
-    public sealed class Move
-    {
-        public Square From { get; init; }
-        public Square To { get; init; }
-        public override string ToString() => $"{From} -> {To}";
-    }
-
-    public sealed class MoveResult
-    {
-        public bool Applied { get; init; }
-        public Guid? CapturedPieceId { get; init; }
-        public string Message { get; init; }
-    }
-
-    public sealed class PieceView
-    {
-        public Guid Id { get; init; }
-        public PieceType Type { get; init; }
-        public PieceColor Color { get; init; }
-        public int File { get; init; }
-        public int Rank { get; init; }
-        public bool Captured { get; init; }
-    }
-
-    public sealed class BoardState
-    {
-        public PieceColor SideToMove { get; init; }
-        public IReadOnlyList<PieceView> Pieces { get; init; }
-        public Guid HiddenTargetPieceId { get; init; }
-    }
-
-    public sealed class GameResult
-    {
-        public PieceColor Winner { get; init; }
-        public string Reason { get; init; } = "";
-    }
-
-
-    public class HideTheKingLogik : IHideTheKingLogic
-    {
-        public event Action<GameResult> OnGameOver;
-
-        private readonly IMoveEngine _engine;
-        private Guid _hiddenTargetPieceId;
-        private Random _rng = new();
-
-        public HideTheKingLogik(IMoveEngine engine)
+        public void Initialize(IReadOnlyList<ChessPiece> pieces, bool? hiddenIsWhite = null, int? randomSeed = null)
         {
-            _engine = engine ?? throw new ArgumentNullException(nameof(engine));
-        }
+            if (pieces == null) throw new ArgumentNullException(nameof(pieces));
+            _rng = randomSeed.HasValue ? new Random(randomSeed.Value) : new Random();
 
-        public void Initialize(NewGameOptions options = null)
-        {
-            options ??= new NewGameOptions();
-            _rng = options.RandomSeed.HasValue ? new Random(options.RandomSeed.Value) : new Random();
-            _engine.SetupClassic();
+            _hiddenIsWhite = hiddenIsWhite ?? (_rng.Next(2) == 0);
 
-            var side = options.HiddenSide ?? (_rng.Next(2) == 0 ? PieceColor.White : PieceColor.Black);
-
-            var pool = _engine.Pieces
-                .Where(p => !p.Captured && p.Color == side && p.Type != PieceType.Pawn)
-                .ToList();
-
+            var pool = pieces.Where(p => p.isWhite == _hiddenIsWhite && p.gameObject != null).ToList();
             if (pool.Count == 0)
-                throw new InvalidOperationException("Keine geeignete Ziel-Figur gefunden (Nicht-Bauer).");
+                throw new InvalidOperationException("Keine geeignete Ziel-Figur gefunden.");
 
-            _hiddenTargetPieceId = pool[_rng.Next(pool.Count)].Id;
+            _hiddenTarget = pool[_rng.Next(pool.Count)];
+            _initialized = true;
         }
 
-        public IReadOnlyList<Move> GetLegalMoves(Square from)
+        public bool RevealGuess(ChessPiece piece)
         {
-            return _engine.GetLegalMoves(from);
+            EnsureInitialized();
+            return piece == _hiddenTarget;
         }
 
-        public bool MakeMove(Move move)
+        public bool ReportCapture(ChessPiece captured, bool capturingIsWhite)
         {
-            var preTarget = _engine.GetPieceAt(move.To);
+            EnsureInitialized();
+            if (captured != _hiddenTarget) return false;
 
-            var result = _engine.ApplyMove(move);
-            if (!result.Applied) return false;
-
-            var capturedId = result.CapturedPieceId ?? preTarget?.Id;
-
-            if (capturedId.HasValue && capturedId.Value == _hiddenTargetPieceId)
-            {
-                OnGameOver?.Invoke(new GameResult
-                {
-                    Winner = OpponentOf(_engine.SideToMove), // Gewinner ist der, der gerade gezogen hat
-                    Reason = $"Geheime Ziel-Figur auf {move.To} wurde geschlagen."
-                });
-            }
-
+            OnGameOver?.Invoke(capturingIsWhite, "Geheime Ziel-Figur wurde geschlagen!");
             return true;
         }
 
-        public bool RevealGuess(Guid pieceId) => pieceId == _hiddenTargetPieceId;
-
-        public BoardState Snapshot() => new BoardState
+        public HiddenTargetStateGeneric Snapshot()
         {
-            SideToMove = _engine.SideToMove,
-            Pieces = _engine.Pieces,
-            HiddenTargetPieceId = _hiddenTargetPieceId
-        };
+            EnsureInitialized();
+            return new HiddenTargetStateGeneric
+            {
+                HiddenTarget = _hiddenTarget,
+                HiddenIsWhite = _hiddenIsWhite
+            };
+        }
 
-        private static PieceColor OpponentOf(PieceColor c) => c == PieceColor.White ? PieceColor.Black : PieceColor.White;
+        private void EnsureInitialized()
+        {
+            if (!_initialized)
+                throw new InvalidOperationException("HiddenTargetLogicGeneric ist nicht initialisiert.");
+        }
+    }
+
+    public sealed class HiddenTargetStateGeneric
+    {
+        public ChessPiece HiddenTarget { get; set; }
+        public bool HiddenIsWhite { get; set; }
     }
 }

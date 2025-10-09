@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace DefaultNamespace
+namespace HideTheKing.Core
 {
     public class ChessPiece : MonoBehaviour
     {

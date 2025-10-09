@@ -2,7 +2,7 @@ using TMPro;
 using UnityEngine;
 using System;
 
-namespace DefaultNamespace
+namespace HideTheKing.Core
 {
     public class GameManager : MonoBehaviour
     {
@@ -18,7 +18,7 @@ namespace DefaultNamespace
         private int blackPieces = 16;
         private string gameStatus = "Ongoing";
         
-        public event Action<bool> OnPieceCaptured; // true = weiß, false = schwarz
+        public event Action<bool> OnPieceCaptured;
         public event Action<string> OnGameStatusChanged;
 
         private void Awake()

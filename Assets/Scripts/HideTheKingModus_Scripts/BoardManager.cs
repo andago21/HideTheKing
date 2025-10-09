@@ -22,11 +22,110 @@ public class BoardManager : MonoBehaviour
 
     public Piece[,] boardPieces = new Piece[8, 8];
     public bool isWhiteTurn = true; // White starts
+    
+    public Transform boardOrigin;   // bottom-left corner of a1
+    public float tileSize = 1.0f;   // world units per square
+    public bool xLeftToRight = true;   // file a->h along +X if true, else -X
+    public bool zBottomToTop = true;   // rank 1->8 along +Z if true, else -Z
+    public Transform squaresParent;    // optional; created if null
 
-    void Start()
+    private void Awake()
+{
+    Debug.Log("[BoardManager] Awake");
+
+    // Ensure a BoardOrigin exists
+    if (boardOrigin == null)
     {
-        SetupBoard();
+        var originGO = GameObject.Find("BoardOrigin");
+        if (originGO == null)
+        {
+            originGO = new GameObject("BoardOrigin");
+            originGO.transform.position = Vector3.zero; // bottom-left of a1; move in scene later if needed
+            Debug.LogWarning("[BoardManager] Created default BoardOrigin at (0,0,0). Assign/move it in the scene for exact placement.");
+        }
+        boardOrigin = originGO.transform;
     }
+
+    // Build the grid if it isn't already valid
+    if (!SquaresArrayIsValid())
+    {
+        BuildSquaresGrid();
+    }
+}
+
+private void Start()
+{
+    // Double-check at Start (some objects can be toggled active between Awake and Start)
+    if (!SquaresArrayIsValid())
+    {
+        Debug.LogWarning("[BoardManager] Squares invalid at Start. Rebuilding grid now.");
+        BuildSquaresGrid();
+
+        if (!SquaresArrayIsValid())
+        {
+            Debug.LogError("[BoardManager] Squares still invalid after rebuild. Aborting SetupBoard().");
+            return;
+        }
+    }
+
+    SetupBoard(); // now safe
+}
+
+private bool SquaresArrayIsValid()
+{
+    if (squares == null || squares.Length != 64) return false;
+    for (int i = 0; i < squares.Length; i++)
+    {
+        if (squares[i] == null) return false;
+    }
+    return true;
+}
+
+private void BuildSquaresGrid()
+{
+    if (boardOrigin == null)
+    {
+        Debug.LogError("[BoardManager] boardOrigin is NULL. Cannot build squares.");
+        return;
+    }
+
+    if (squaresParent == null)
+    {
+        squaresParent = new GameObject("Squares").transform;
+        squaresParent.SetParent(transform, worldPositionStays: true);
+    }
+    if (!squaresParent.gameObject.activeInHierarchy)
+        squaresParent.gameObject.SetActive(true);
+
+    if (tileSize <= 0f)
+    {
+        tileSize = 1f;
+        Debug.LogWarning("[BoardManager] tileSize was <= 0. Reset to 1.");
+    }
+
+    squares = new Transform[64];
+
+    Vector3 xStep = (xLeftToRight ? Vector3.right : -Vector3.right) * tileSize;
+    Vector3 zStep = (zBottomToTop ? Vector3.forward : -Vector3.forward) * tileSize;
+
+    for (int row = 0; row < 8; row++)
+    for (int col = 0; col < 8; col++)
+    {
+        int idx = row * 8 + col;
+
+        var go = new GameObject($"Square_{row}_{col}");
+        go.transform.SetParent(squaresParent, worldPositionStays: false);
+        go.transform.position = boardOrigin.position + (xStep * col) + (zStep * row);
+
+        var bc = go.AddComponent<BoxCollider>();
+        bc.size = new Vector3(tileSize, 0.05f, tileSize);
+
+        squares[idx] = go.transform;
+    }
+
+    Debug.Log("[BoardManager] Squares grid generated (8x8).");
+}
+
 
     void SetupBoard()
     {
@@ -81,14 +180,19 @@ public class BoardManager : MonoBehaviour
         SetupPiece(blackKing, false, PieceType.King, 60); // e8
     }
 
+
     private void SetupPiece(GameObject prefab, bool isWhitePiece, PieceType pieceType, int index)
     {
-        int row = index / 8;
-        int col = index % 8;
-        Vector3 pos = squares[index].position;
-        if (pieceType == PieceType.Pawn) pos += Vector3.down * 0.09f; // Your offset for pawns
+        int row = index / 8;   // 0–7 internally
+        int col = index % 8;   // 0–7 internally
 
-        GameObject pieceObj = Instantiate(prefab, pos, Quaternion.identity, squares[index]);
+        Vector3 basePos = squares[index].position;
+
+        // Remove any pawn offset (we keep all at same Y height)
+        GameObject pieceObj = Instantiate(prefab, basePos, Quaternion.identity, squares[index]);
+        Vector3 p = pieceObj.transform.position;
+        pieceObj.transform.position = new Vector3(p.x, basePos.y, p.z);
+
         Piece piece = pieceObj.GetComponent<Piece>();
         if (piece != null)
         {
@@ -96,10 +200,20 @@ public class BoardManager : MonoBehaviour
             piece.type = pieceType;
             piece.position = new Vector2Int(row, col);
             boardPieces[row, col] = piece;
+
+            // 🟢 Print board coordinates in 1–8 system
+            int xBoard = row + 1; // human-readable (1–8)
+            int zBoard = col + 1;
+            string color = isWhitePiece ? "White" : "Black";
+
+            Debug.Log($"{color} {pieceType} → (x = {xBoard}, z = {zBoard})");
         }
         else
         {
             Debug.LogError($"Piece component missing on {prefab.name}");
         }
     }
+
+
+
 }

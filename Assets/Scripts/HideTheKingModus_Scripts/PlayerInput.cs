@@ -5,9 +5,6 @@ using System.Collections;
 public class PlayerInput : MonoBehaviour
 {
     public BoardManager boardManager;
-    public GameObject highlightPrefab;
-    public GameObject moveEffectPrefab; 
-    public GameObject captureEffectPrefab; 
 
     private Piece selectedPiece;
     private List<GameObject> highlights = new List<GameObject>();
@@ -69,25 +66,21 @@ public class PlayerInput : MonoBehaviour
         {
             int index = move.x * 8 + move.y;
             Vector3 pos = boardManager.squares[index].position + new Vector3(-0.5f, -0.08f, +0.5f);
-            GameObject highlight = Instantiate(highlightPrefab, pos, Quaternion.Euler(0, 0, 0));
-            highlights.Add(highlight);
         }
     }
-
+    
     private void MovePiece(Vector2Int target)
     {
         Vector3 targetPos = boardManager.squares[target.x * 8 + target.y].position;
+
+        // 🔒 Keep current Y so movement is strictly on X/Z
+        targetPos.y = selectedPiece.transform.position.y;
 
         // Capture
         Piece targetPiece = boardManager.boardPieces[target.x, target.y];
         if (targetPiece != null)
         {
             Destroy(targetPiece.gameObject);
-            if (captureEffectPrefab != null) Instantiate(captureEffectPrefab, targetPos, Quaternion.identity);
-        }
-        else
-        {
-            if (moveEffectPrefab != null) Instantiate(moveEffectPrefab, targetPos, Quaternion.identity);
         }
 
         // Update board
@@ -103,15 +96,23 @@ public class PlayerInput : MonoBehaviour
     {
         float duration = 0.5f;
         Vector3 start = pieceTrans.position;
+
+        // 🔒 Clamp Y for the whole animation
+        float fixedY = start.y;
+        targetPos.y = fixedY;
+
         float elapsed = 0;
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
-            pieceTrans.position = Vector3.Lerp(start, targetPos, elapsed / duration);
+            Vector3 next = Vector3.Lerp(start, targetPos, elapsed / duration);
+            next.y = fixedY;               // <- keep Y locked
+            pieceTrans.position = next;
             yield return null;
         }
-        pieceTrans.position = targetPos;
+        pieceTrans.position = targetPos;   // already has fixed Y
     }
+
 
     private void ClearSelection()
     {

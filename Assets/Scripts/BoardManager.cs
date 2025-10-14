@@ -25,6 +25,13 @@ public class BoardManager : MonoBehaviour
 
     void Start()
     {
+        // Ensure squares are aligned to X-Z plane
+        for (int i = 0; i < squares.Length; i++)
+        {
+            Vector3 pos = squares[i].position;
+            pos.y = transform.position.y; // Lock Y to board height
+            squares[i].position = pos;
+        }
         SetupBoard();
     }
 
@@ -86,9 +93,11 @@ public class BoardManager : MonoBehaviour
         int row = index / 8;
         int col = index % 8;
         Vector3 pos = squares[index].position;
-        if (pieceType == PieceType.Pawn) pos += Vector3.down * 0.09f; // Your offset for pawns
+        pos.y = transform.position.y;
+        if (pieceType == PieceType.Pawn) pos.y += 0.09f; // Your offset for pawns
 
-        GameObject pieceObj = Instantiate(prefab, pos, Quaternion.identity, squares[index]);
+        // Instantiate without parenting to squares[index]
+        GameObject pieceObj = Instantiate(prefab, pos, Quaternion.identity); // No parent specified
         Piece piece = pieceObj.GetComponent<Piece>();
         if (piece != null)
         {

@@ -69,6 +69,7 @@ public class PlayerInput : MonoBehaviour
         {
             int index = move.x * 8 + move.y;
             Vector3 pos = boardManager.squares[index].position + new Vector3(-0.5f, -0.08f, +0.5f);
+            pos.y = boardManager.transform.position.y + 0.01f; // Lock Y for highlights
             GameObject highlight = Instantiate(highlightPrefab, pos, Quaternion.Euler(0, 0, 0));
             highlights.Add(highlight);
         }
@@ -77,6 +78,7 @@ public class PlayerInput : MonoBehaviour
     private void MovePiece(Vector2Int target)
     {
         Vector3 targetPos = boardManager.squares[target.x * 8 + target.y].position;
+        targetPos.y = boardManager.transform.position.y; // Lock Y to board height
 
         // Capture
         Piece targetPiece = boardManager.boardPieces[target.x, target.y];
@@ -103,10 +105,14 @@ public class PlayerInput : MonoBehaviour
     {
         float duration = 0.5f;
         Vector3 start = pieceTrans.position;
+        start.y = boardManager.transform.position.y; // Lock starting Y
+        targetPos.y = boardManager.transform.position.y; // Lock target Y
         float elapsed = 0;
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
+            Vector3 newPos = Vector3.Lerp(start, targetPos, elapsed / duration);
+            newPos.y = boardManager.transform.position.y; // Enforce Y during lerp
             pieceTrans.position = Vector3.Lerp(start, targetPos, elapsed / duration);
             yield return null;
         }

@@ -96,7 +96,7 @@ public class BoardManager : MonoBehaviour
         pos.y = prefab.transform.position.y;
 
         // Instantiate without parenting to squares[index]
-        GameObject pieceObj = Instantiate(prefab, pos, Quaternion.identity); // No parent specified
+        GameObject pieceObj = Instantiate(prefab, pos, prefab.transform.rotation); // No parent specified
         Piece piece = pieceObj.GetComponent<Piece>();
         if (piece != null)
         {

@@ -93,8 +93,7 @@ public class BoardManager : MonoBehaviour
         int row = index / 8;
         int col = index % 8;
         Vector3 pos = squares[index].position;
-        pos.y = transform.position.y;
-        if (pieceType == PieceType.Pawn) pos.y += 0.09f; // Your offset for pawns
+        pos.y = prefab.transform.position.y;
 
         // Instantiate without parenting to squares[index]
         GameObject pieceObj = Instantiate(prefab, pos, Quaternion.identity); // No parent specified

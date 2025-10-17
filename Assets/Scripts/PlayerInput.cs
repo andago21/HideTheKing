@@ -11,7 +11,7 @@ public class PlayerInput : MonoBehaviour
 
     private Piece selectedPiece;
     private List<GameObject> highlights = new List<GameObject>();
-
+    
     void Update()
     {
         if (Input.GetMouseButtonDown(0))
@@ -23,6 +23,7 @@ public class PlayerInput : MonoBehaviour
                 if (hitPiece != null && selectedPiece == null && hitPiece.isWhite == boardManager.isWhiteTurn)
                 {
                     selectedPiece = hitPiece;
+                    Debug.Log(selectedPiece.type + " has a Y of: " + selectedPiece.transform.position.y);
                     ShowPossibleMoves();
                     return;
                 }
@@ -68,8 +69,7 @@ public class PlayerInput : MonoBehaviour
         foreach (var move in moves)
         {
             int index = move.x * 8 + move.y;
-            Vector3 pos = boardManager.squares[index].position + new Vector3(-0.5f, -0.08f, +0.5f);
-            pos.y = boardManager.transform.position.y + 0.01f; // Lock Y for highlights
+            Vector3 pos = boardManager.squares[index].position + new Vector3(-0.5f, highlightPrefab.transform.position.y, +0.5f);
             GameObject highlight = Instantiate(highlightPrefab, pos, Quaternion.Euler(0, 0, 0));
             highlights.Add(highlight);
         }
@@ -78,7 +78,6 @@ public class PlayerInput : MonoBehaviour
     private void MovePiece(Vector2Int target)
     {
         Vector3 targetPos = boardManager.squares[target.x * 8 + target.y].position;
-        targetPos.y = boardManager.transform.position.y; // Lock Y to board height
 
         // Capture
         Piece targetPiece = boardManager.boardPieces[target.x, target.y];

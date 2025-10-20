@@ -2645,9 +2645,9 @@ MonoBehaviour:
   blackPawn: {fileID: 9109085475764052608, guid: 4c67ad2f3193ba643b5dadfb04ff8320, type: 3}
   blackRook: {fileID: 2367031088003102976, guid: 3a4d181a274cf9542a5f3496efdeefa9, type: 3}
   blackKnight: {fileID: 7507015086866124536, guid: 4f23d9b3764a92c41960fc88582ab776, type: 3}
-  blackBishop: {fileID: 759925915883227301, guid: 063419185fcc46a4c86b2515101d75b5, type: 3}
-  blackQueen: {fileID: 8662680903300954806, guid: d5e1b366863c1154285949002096cf97, type: 3}
-  blackKing: {fileID: 7320585088075088398, guid: e18d4c042b2832346b39fae7f8c6ddc0, type: 3}
+  blackBishop: {fileID: 6585987850542504219, guid: 142aa92a3e9fe924992d6384cd3dd839, type: 3}
+  blackQueen: {fileID: 5246754002956934924, guid: d210ddf29295fb844acf4f1cb7dd369c, type: 3}
+  blackKing: {fileID: 2260879777316495995, guid: d802cf4ea8d0b5448ba5dc609f2f88e2, type: 3}
   isWhiteTurn: 1
   enPassantTarget: {x: -1, y: -1}
 --- !u!1 &1328888057

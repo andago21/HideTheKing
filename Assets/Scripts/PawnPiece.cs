@@ -39,6 +39,25 @@ public class PawnPiece : Piece
             }
         }
 
+        // En passant
+        BoardManager bm = GameObject.FindObjectOfType<BoardManager>();
+        if (bm != null && bm.enPassantTarget.x != -1)
+        {
+            Vector2Int enPassantCapture = bm.enPassantTarget;
+            if (IsInBounds(enPassantCapture))
+            {
+                // Check if this pawn can capture via en passant
+                foreach (var offset in captureOffsets)
+                {
+                    Vector2Int capturePos = position + offset;
+                    if (capturePos == enPassantCapture)
+                    {
+                        moves.Add(capturePos);
+                    }
+                }
+            }
+        }        
+
         return moves;
     }
 

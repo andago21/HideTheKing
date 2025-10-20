@@ -2,17 +2,28 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+
+public enum GameState
+{
+    Playing,
+    WhiteWins,
+    BlackWins,
+    Draw
+}
+
+
 public class BoardManager : MonoBehaviour
 {
     public Transform[] squares; // 0-63, a1 to h8
-    
+    public GameState gameState = GameState.Playing;
+
     public GameObject whitePawn;
     public GameObject whiteRook;
     public GameObject whiteKnight;
     public GameObject whiteBishop;
     public GameObject whiteQueen;
     public GameObject whiteKing;
-    
+
     public GameObject blackPawn;
     public GameObject blackRook;
     public GameObject blackKnight;
@@ -22,6 +33,7 @@ public class BoardManager : MonoBehaviour
 
     public Piece[,] boardPieces = new Piece[8, 8];
     public bool isWhiteTurn = true; // White starts
+    public Vector2Int enPassantTarget = new Vector2Int(-1, -1); // -1, -1 means no en passant available
 
     void Start()
     {

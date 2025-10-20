@@ -24,6 +24,34 @@ public class KingPiece : Piece
             }
         }
 
+        // Castling
+        if (!hasMoved)
+        {
+            int row = position.x;
+
+            // Kingside castling (right)
+            Piece kingsideRook = board[row, 7];
+            if (kingsideRook != null && kingsideRook.type == PieceType.Rook && !kingsideRook.hasMoved)
+            {
+                // Check if squares between are empty
+                if (board[row, 5] == null && board[row, 6] == null)
+                {
+                    moves.Add(new Vector2Int(row, 6)); // King moves to g-file
+                }
+            }
+
+            // Queenside castling (left)
+            Piece queensideRook = board[row, 0];
+            if (queensideRook != null && queensideRook.type == PieceType.Rook && !queensideRook.hasMoved)
+            {
+                // Check if squares between are empty
+                if (board[row, 1] == null && board[row, 2] == null && board[row, 3] == null)
+                {
+                    moves.Add(new Vector2Int(row, 2)); // King moves to c-file
+                }
+            }
+        }
+
         return moves;
     }
 }

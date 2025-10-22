@@ -128,13 +128,16 @@ public class PlayerInput : MonoBehaviour
                 Piece capturedPawn = boardManager.boardPieces[capturedPawnPos.x, capturedPawnPos.y];
                 if (capturedPawn != null)
                 {
-                    Destroy(capturedPawn.gameObject);
+                    // Move captured pawn to graveyard instead of destroying
                     boardManager.boardPieces[capturedPawnPos.x, capturedPawnPos.y] = null;
+
                     if (captureEffectPrefab != null)
                     {
                         Vector3 capturePos = boardManager.squares[capturedPawnPos.x * 8 + capturedPawnPos.y].position;
                         Instantiate(captureEffectPrefab, capturePos, Quaternion.identity);
                     }
+
+                    boardManager.SendToSide(capturedPawn);
                 }
             }
         }
@@ -192,13 +195,15 @@ public class PlayerInput : MonoBehaviour
         // Capture
         if (targetPiece != null)
         {
-            Destroy(targetPiece.gameObject);
+            // Move captured target to graveyard
             if (captureEffectPrefab != null) Instantiate(captureEffectPrefab, targetPos, Quaternion.identity);
+            boardManager.SendToSide(targetPiece);
         }
         else
         {
             if (moveEffectPrefab != null) Instantiate(moveEffectPrefab, targetPos, Quaternion.identity);
         }
+
 
 
         // Check if pawn moved two squares (enable en passant for next turn)

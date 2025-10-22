@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CopilotDiffPersistence">
+    <option name="pendingDiffs">
+      <map>
+        <entry key="$PROJECT_DIR$/Assets/Scripts/UIManager.cs">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="$PROJECT_DIR$/Assets/Scripts/UIManager.cs" />
+              <option name="updatedContent" value="using UnityEngine;&#10;using UnityEngine.UI;&#10;using TMPro;&#10;&#10;public class UIManager : MonoBehaviour&#10;{&#10;    public TextMeshProUGUI gameStateText;&#10;&#10;    public void UpdateGameState(GameState state)&#10;    {&#10;        switch (state)&#10;        {&#10;            case GameState.Playing:&#10;                gameStateText.text = &quot;Game in Progress&quot;;&#10;                break;&#10;            case GameState.WhiteWins:&#10;                gameStateText.text = &quot;White Wins!&quot;;&#10;                break;&#10;            case GameState.BlackWins:&#10;                gameStateText.text = &quot;Black Wins!&quot;;&#10;                break;&#10;            case GameState.Draw:&#10;                gameStateText.text = &quot;Game Draw&quot;;&#10;                break;&#10;        }&#10;    }&#10;}" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>

@@ -30,11 +30,17 @@ public class BoardManager : MonoBehaviour
     public GameObject blackBishop;
     public GameObject blackQueen;
     public GameObject blackKing;
-
+    
     public Piece[,] boardPieces = new Piece[8, 8];
     public bool isWhiteTurn = true; // White starts
     public Vector2Int enPassantTarget = new Vector2Int(-1, -1); // -1, -1 means no en passant available
-
+    
+    public Transform[] whiteCapturedSlots;
+    public Transform[] blackCapturedSlots;
+    
+    public int whiteCapturedCount = 0;
+    public int blackCapturedCount = 0;
+    
     void Start()
     {
         // Ensure squares are aligned to X-Z plane
@@ -107,7 +113,6 @@ public class BoardManager : MonoBehaviour
         Vector3 pos = squares[index].position;
         pos.y = prefab.transform.position.y;
 
-        // Instantiate without parenting to squares[index]
         GameObject pieceObj = Instantiate(prefab, pos, prefab.transform.rotation); // No parent specified
         Piece piece = pieceObj.GetComponent<Piece>();
         if (piece != null)
@@ -122,4 +127,56 @@ public class BoardManager : MonoBehaviour
             Debug.LogError($"Piece component missing on {prefab.name}");
         }
     }
+    
+    public void SendToSide(Piece capturedPiece)
+    {
+        if (capturedPiece == null) return;
+
+        // Choose slots based on the color of the piece that got captured
+        Transform[] slots = capturedPiece.isWhite ? whiteCapturedSlots : blackCapturedSlots;
+
+        // Pick index and overflow behavior
+        int idx = capturedPiece.isWhite ? whiteCapturedCount++ : blackCapturedCount++;
+        Vector3 targetPos;
+        
+        // Keep the piece's original rotation
+        Quaternion targetRot = capturedPiece.transform.rotation;
+
+        if (slots != null && slots.Length > 0)
+        {
+            // Clamp to last slot and start stacking with a tiny offset if we overflow
+            int clamped = Mathf.Clamp(idx, 0, slots.Length - 1);
+            float overflow = Mathf.Max(0, idx - (slots.Length - 1));
+            Vector3 stackOffset = new Vector3(0f, 0f, 0.18f * overflow); // gentle forward stack
+
+            targetPos = slots[clamped].position + stackOffset;
+        }
+        else
+        {
+            targetPos = transform.position + new Vector3(10f, 0f, 0f);
+        }
+
+        // Disable interaction on the captured piece
+        var colls = capturedPiece.GetComponentsInChildren<Collider>(true);
+        foreach (var c in colls) c.enabled = false;
+
+        var rb = capturedPiece.GetComponent<Rigidbody>();
+        if (rb) rb.isKinematic = true;
+
+        // Prevent its Piece script from participating in logic anymore
+        capturedPiece.enabled = false;
+
+        // Parent to slot (keeps it tidy in hierarchy)
+        if (slots != null && slots.Length > 0)
+        {
+            int clamped = Mathf.Clamp(idx, 0, slots.Length - 1);
+            capturedPiece.transform.SetParent(slots[clamped], true);
+        }
+
+        // Snap to target (keep board Y height)
+        targetPos.y = transform.position.y;
+        capturedPiece.transform.SetPositionAndRotation(targetPos, targetRot);
+    }
+
+    
 }

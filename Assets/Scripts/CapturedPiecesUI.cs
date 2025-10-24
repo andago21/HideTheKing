@@ -8,7 +8,6 @@ namespace HideTheKing.Core
         public TMP_Text whiteCapturedText;
         public TMP_Text blackCapturedText;
         public BoardManager boardManager;
-
         private void Update()
         {
             if (boardManager != null)

@@ -283,9 +283,7 @@ public class PlayerInput : MonoBehaviour
         );
 
         moveNotation.RecordMove(notation, boardManager.isWhiteTurn);
-
-
-
+        
         // Check all game-ending conditions
         gameRules.CheckGameEndConditions(boardManager.isWhiteTurn);
     }

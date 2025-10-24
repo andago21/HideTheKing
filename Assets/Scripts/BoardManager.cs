@@ -148,18 +148,13 @@ public class BoardManager : MonoBehaviour
             int clamped = Mathf.Clamp(idx, 0, slots.Length - 1);
             float overflow = Mathf.Max(0, idx - (slots.Length - 1));
             Vector3 stackOffset = new Vector3(0f, 0f, 0.18f * overflow); // gentle forward stack
-
             targetPos = slots[clamped].position + stackOffset;
         }
-        else
-        {
-            targetPos = transform.position + new Vector3(10f, 0f, 0f);
-        }
+        else targetPos = transform.position + new Vector3(10f, 0f, 0f);
 
         // Disable interaction on the captured piece
         var colls = capturedPiece.GetComponentsInChildren<Collider>(true);
         foreach (var c in colls) c.enabled = false;
-
         var rb = capturedPiece.GetComponent<Rigidbody>();
         if (rb) rb.isKinematic = true;
 

@@ -5,10 +5,16 @@ using UnityEngine;
 
 namespace HideTheKing.Core
 {
+    public enum PieceSide
+    {
+        None,
+        Left,
+        Right
+    }
+
     public sealed class HiddenTargetLogicGeneric
     {
         public event Action<bool, string> OnGameOver;
-
         private System.Random _rng = new System.Random();
         private Piece _hiddenTarget;
         private bool _hiddenIsWhite;
@@ -36,21 +42,19 @@ namespace HideTheKing.Core
 
             _hiddenTarget = pool[_rng.Next(pool.Count)];
             _initialized = true;
-
-#if UNITY_EDITOR
-            Debug.Log($"[HideTheKing] Hide The King: {_hiddenTarget.name} ({_hiddenTarget.type}, {(_hiddenIsWhite ? "Weiß" : "Schwarz")})");
-#endif
         }
 
         public bool ReportCapture(Piece captured, bool capturingIsWhite)
         {
-            if (captured != _hiddenTarget)
-                return false;
+            if (captured == _hiddenTarget)
+            {
+                OnGameOver?.Invoke(capturingIsWhite, "Hidden Target Captured!");
+                return true;
+            }
 
-            OnGameOver?.Invoke(capturingIsWhite, "Check Mate!");
-            return true;
+            return false;
         }
-
+        
         public HiddenTargetStateGeneric Snapshot()
         {
             return new HiddenTargetStateGeneric
@@ -59,7 +63,33 @@ namespace HideTheKing.Core
                 HiddenIsWhite = _hiddenIsWhite
             };
         }
-        
+
+        public static PieceSide GetSide(Piece piece)
+        {
+            if (piece == null)
+                return PieceSide.None;
+
+            if (piece.type != PieceType.Rook &&
+                piece.type != PieceType.Bishop &&
+                piece.type != PieceType.Knight)
+                return PieceSide.None;
+
+            // position.y is the column (0 = file a, 7 = file h)
+            int col = piece.position.y;
+
+            return col <= 3 ? PieceSide.Left : PieceSide.Right;
+        }
+
+        public static string GetSideName(Piece piece)
+        {
+            var side = GetSide(piece);
+            switch (side)
+            {
+                case PieceSide.Left:  return "Left";
+                case PieceSide.Right: return "Right";
+                default:              return "Center";
+            }
+        }
     }
 
     public sealed class HiddenTargetStateGeneric

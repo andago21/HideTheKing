@@ -1,5 +1,7 @@
+using System;
 using UnityEngine;
 using System.Collections.Generic;
+using HideTheKing.Core;
 
 public class Piece : MonoBehaviour
 {
@@ -102,12 +104,8 @@ public class Piece : MonoBehaviour
     public static bool IsCheckmate(Piece[,] board, bool isWhiteKing)
     {
         // First, check if the king is in check
-        if (!IsKingInCheck(board, isWhiteKing))
-        {
-            return false; // Not in check, so can't be checkmate
-        }
+        if (!IsKingInCheck(board, isWhiteKing)) return false; // Not in check, so can't be checkmate
 
-        // King is in check - now check if there are ANY legal moves for this player
         for (int row = 0; row < 8; row++)
         {
             for (int col = 0; col < 8; col++)
@@ -116,10 +114,8 @@ public class Piece : MonoBehaviour
                 if (piece != null && piece.isWhite == isWhiteKing)
                 {
                     List<Vector2Int> legalMoves = piece.GetLegalMovesWithCheckValidation(board);
-                    if (legalMoves.Count > 0)
-                    {
-                        return false; // Found a legal move, not checkmate
-                    }
+                    if (legalMoves.Count > 0) return false; // Found a legal move, not checkmate
+                    Debug.Log("CHECK MATE");
                 }
             }
         }

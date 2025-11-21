@@ -10,15 +10,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 17fcc932c4074d74d8bc5973aa3e7ea7, type: 3}
       propertyPath: m_LocalScale.x
-      value: 32
+      value: 34
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 17fcc932c4074d74d8bc5973aa3e7ea7, type: 3}
       propertyPath: m_LocalScale.y
-      value: 32
+      value: 34
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 17fcc932c4074d74d8bc5973aa3e7ea7, type: 3}
       propertyPath: m_LocalScale.z
-      value: 32
+      value: 34
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 17fcc932c4074d74d8bc5973aa3e7ea7, type: 3}
       propertyPath: m_LocalPosition.x
@@ -121,3 +121,4 @@ MonoBehaviour:
   isWhite: 1
   type: 0
   position: {x: 0, y: 0}
+  hasMoved: 0

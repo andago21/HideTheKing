@@ -54,7 +54,7 @@ public class ChessTimer : MonoBehaviour
         // Display timer periodically (optional, for debugging)
         if (Time.time >= nextDisplayTime)
         {
-            Debug.Log("White: " + GetFormattedTime(true) + " | Black: " + GetFormattedTime(false));
+            //Debug.Log("White: " + GetFormattedTime(true) + " | Black: " + GetFormattedTime(false));
             nextDisplayTime = Time.time + displayInterval;
         }
 

@@ -54,6 +54,15 @@ public class PlayerInput : MonoBehaviour
                 if (hitPiece != null && selectedPiece == null && hitPiece.isWhite == boardManager.isWhiteTurn)
                 {
                     selectedPiece = hitPiece;
+                    var hidden = HideTheKing.Core.HideTheKingManager.Instance
+                        .GetHiddenState(hitPiece.isWhite)?.HiddenTarget;
+
+                    if (hidden != null && hitPiece == hidden)
+                    {
+                        selectedPiece = hitPiece;
+                        ShowPossibleMovesHTK();
+                        return; // IMPORTANT
+                    }
                     //Debug.Log(selectedPiece.type + " has a Y of: " + selectedPiece.transform.position.y);
                     ShowPossibleMoves();
                     return;
@@ -362,5 +371,21 @@ public class PlayerInput : MonoBehaviour
         }
 
         Debug.Log("Pawn promoted to " + randomType + "!");
+    }
+    
+    private void ShowPossibleMovesHTK()
+    {
+        ClearHighlights();
+
+        List<Vector2Int> safeMoves = selectedPiece.GetLegalMovesHTK(boardManager.boardPieces);
+        foreach (var move in safeMoves)
+        {
+            int index = move.x * 8 + move.y;
+            Vector3 pos = boardManager.squares[index].position 
+                          + new Vector3(-0.5f, highlightPrefab.transform.position.y, +0.5f);
+
+            GameObject hl = Instantiate(highlightPrefab, pos, Quaternion.identity);
+            highlights.Add(hl);
+        }
     }
 }

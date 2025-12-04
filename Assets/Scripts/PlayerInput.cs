@@ -54,6 +54,15 @@ public class PlayerInput : MonoBehaviour
                 if (hitPiece != null && selectedPiece == null && hitPiece.isWhite == boardManager.isWhiteTurn)
                 {
                     selectedPiece = hitPiece;
+                    var hidden = HideTheKing.Core.HideTheKingManager.Instance
+                        .GetHiddenState(hitPiece.isWhite)?.HiddenTarget;
+
+                    if (hidden != null && hitPiece == hidden)
+                    {
+                        selectedPiece = hitPiece;
+                        ShowPossibleMovesHTK();
+                        return; // IMPORTANT
+                    }
                     //Debug.Log(selectedPiece.type + " has a Y of: " + selectedPiece.transform.position.y);
                     ShowPossibleMoves();
                     return;
@@ -128,13 +137,16 @@ public class PlayerInput : MonoBehaviour
                 Piece capturedPawn = boardManager.boardPieces[capturedPawnPos.x, capturedPawnPos.y];
                 if (capturedPawn != null)
                 {
-                    Destroy(capturedPawn.gameObject);
+                    // Move captured pawn to graveyard instead of destroying
                     boardManager.boardPieces[capturedPawnPos.x, capturedPawnPos.y] = null;
+
                     if (captureEffectPrefab != null)
                     {
                         Vector3 capturePos = boardManager.squares[capturedPawnPos.x * 8 + capturedPawnPos.y].position;
                         Instantiate(captureEffectPrefab, capturePos, Quaternion.identity);
                     }
+
+                    boardManager.SendToSide(capturedPawn);
                 }
             }
         }
@@ -192,13 +204,15 @@ public class PlayerInput : MonoBehaviour
         // Capture
         if (targetPiece != null)
         {
-            Destroy(targetPiece.gameObject);
+            // Move captured target to graveyard
             if (captureEffectPrefab != null) Instantiate(captureEffectPrefab, targetPos, Quaternion.identity);
+            boardManager.SendToSide(targetPiece);
         }
         else
         {
             if (moveEffectPrefab != null) Instantiate(moveEffectPrefab, targetPos, Quaternion.identity);
         }
+
 
 
         // Check if pawn moved two squares (enable en passant for next turn)
@@ -278,9 +292,7 @@ public class PlayerInput : MonoBehaviour
         );
 
         moveNotation.RecordMove(notation, boardManager.isWhiteTurn);
-
-
-
+        
         // Check all game-ending conditions
         gameRules.CheckGameEndConditions(boardManager.isWhiteTurn);
     }
@@ -359,5 +371,21 @@ public class PlayerInput : MonoBehaviour
         }
 
         Debug.Log("Pawn promoted to " + randomType + "!");
+    }
+    
+    private void ShowPossibleMovesHTK()
+    {
+        ClearHighlights();
+
+        List<Vector2Int> safeMoves = selectedPiece.GetLegalMovesHTK(boardManager.boardPieces);
+        foreach (var move in safeMoves)
+        {
+            int index = move.x * 8 + move.y;
+            Vector3 pos = boardManager.squares[index].position 
+                          + new Vector3(-0.5f, highlightPrefab.transform.position.y, +0.5f);
+
+            GameObject hl = Instantiate(highlightPrefab, pos, Quaternion.identity);
+            highlights.Add(hl);
+        }
     }
 }

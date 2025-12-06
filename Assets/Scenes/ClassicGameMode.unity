@@ -2682,13 +2682,13 @@ MonoBehaviour:
   gameState: 0
   whitePawn: {fileID: 5323106344654674602, guid: 5c2d9dc2c15bf4645814695b3036b5d2, type: 3}
   whiteRook: {fileID: 7768081178613237500, guid: 9886809fb13704143a286e631214a87b, type: 3}
-  whiteKnight: {fileID: 6352198257237643112, guid: e8a856ba4c8877e4a825c31ea8a8bfc3, type: 3}
+  whiteKnight: {fileID: 699062506839624258, guid: 195cbd33cee516077afacf697ec20814, type: 3}
   whiteBishop: {fileID: 7163552333777595991, guid: d9bd24a626fee39408f1128a8b9e9f1c, type: 3}
   whiteQueen: {fileID: 4143993747224598898, guid: 7b3b323a20a04f540888b88fb8c35d6d, type: 3}
   whiteKing: {fileID: 4376501729349753782, guid: 78eefacea99d0994aa09f288b3dd81ff, type: 3}
   blackPawn: {fileID: 4824244325067912309, guid: 4c67ad2f3193ba643b5dadfb04ff8320, type: 3}
   blackRook: {fileID: 2590073585237835122, guid: 499d432a93667a742bddf6ec1b9a3303, type: 3}
-  blackKnight: {fileID: 7507015086866124536, guid: 4f23d9b3764a92c41960fc88582ab776, type: 3}
+  blackKnight: {fileID: 8530582265751315021, guid: ad8342b9da74b3e5aba47c5a3d7ccbf6, type: 3}
   blackBishop: {fileID: 6585987850542504219, guid: 142aa92a3e9fe924992d6384cd3dd839, type: 3}
   blackQueen: {fileID: 5246754002956934924, guid: d210ddf29295fb844acf4f1cb7dd369c, type: 3}
   blackKing: {fileID: 2260879777316495995, guid: d802cf4ea8d0b5448ba5dc609f2f88e2, type: 3}

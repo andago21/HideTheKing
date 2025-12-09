@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
+using UnityEngine.SceneManagement;
 
 // Vetem une edhe zoti e dim si funksionon ky kod, as ChatGPT as Claude asilloj AI nuk e zgjidh dot.
 // Duhet me e transferu ne Clean Code
@@ -54,15 +55,23 @@ public class PlayerInput : MonoBehaviour
                 if (hitPiece != null && selectedPiece == null && hitPiece.isWhite == boardManager.isWhiteTurn)
                 {
                     selectedPiece = hitPiece;
-                    var hidden = HideTheKing.Core.HideTheKingManager.Instance
-                        .GetHiddenState(hitPiece.isWhite)?.HiddenTarget;
-
-                    if (hidden != null && hitPiece == hidden)
+                    
+                    // Only check HideTheKingManager in HideTheKing scenes
+                    if (SceneManager.GetActiveScene().name.Contains("HideTheKingGameMode"))
                     {
-                        selectedPiece = hitPiece;
-                        ShowPossibleMovesHTK();
-                        return; // IMPORTANT
+                        var htkManager = HideTheKing.Core.HideTheKingManager.Instance;
+                        if (htkManager != null)
+                        {
+                            var hidden = htkManager.GetHiddenState(hitPiece.isWhite)?.HiddenTarget;
+                            if (hidden != null && hitPiece == hidden)
+                            {
+                                selectedPiece = hitPiece;
+                                ShowPossibleMovesHTK();
+                                return; // IMPORTANT
+                            }
+                        }
                     }
+                    
                     //Debug.Log(selectedPiece.type + " has a Y of: " + selectedPiece.transform.position.y);
                     ShowPossibleMoves();
                     return;
@@ -291,7 +300,7 @@ public class PlayerInput : MonoBehaviour
             promotedTo
         );
 
-        moveNotation.RecordMove(notation, boardManager.isWhiteTurn);
+        moveNotation.RecordMove(notation, boardManager.isWhiteTurn, isCapture);
         
         // Check all game-ending conditions
         gameRules.CheckGameEndConditions(boardManager.isWhiteTurn);

@@ -90,10 +90,17 @@ public class MoveNotation : MonoBehaviour
     {
         string playerColor = isWhiteMove ? "White" : "Black";
 
+        string arrowNotation = "";
+        int arrowIndex = moveNotation.LastIndexOf("(");
+        if (arrowIndex != -1)
+        {
+            arrowNotation = moveNotation.Substring(arrowIndex + 1, moveNotation.Length - arrowIndex - 2); // Extract content between ( )
+        }
+
         // Format the move for better readability
         string formattedMove = isCapture
-            ? $"{playerColor} Move: {moveNotation} (Capture)"
-            : $"{playerColor} Move: {moveNotation}\n";
+            ? $"{playerColor} Move, Capture({arrowNotation})\n"
+            : $"{playerColor} Move: {arrowNotation}\n";
 
         moveHistory.Add(formattedMove);
 

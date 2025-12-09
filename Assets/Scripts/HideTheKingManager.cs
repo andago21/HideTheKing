@@ -14,6 +14,8 @@ namespace HideTheKing.Core
         private HiddenTargetLogicGeneric _blackLogic;
         private bool _gameOverTriggered;
         private GameRules _gameRules;
+        
+        public static bool HideTheKingMode = true;
 
         // Track check warnings so they don’t spam
         private bool whiteHiddenInCheck = false;
@@ -97,7 +99,7 @@ namespace HideTheKing.Core
 
 
         // Check if an enemy piece attacks the hidden role’s square
-        private bool IsPieceInCheck(Piece target)
+        public bool IsPieceInCheck(Piece target)
         {
             Piece[,] board = _gameRules.boardManager.boardPieces;
             Vector2Int targetPos = target.position;

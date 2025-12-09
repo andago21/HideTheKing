@@ -61,6 +61,43 @@ public class Piece : MonoBehaviour
         return legalMoves;
     }
     
+    public List<Vector2Int> GetLegalMovesHTK(Piece[,] board)
+    {
+        List<Vector2Int> potential = GetLegalMoves(board);
+        List<Vector2Int> safeMoves = new List<Vector2Int>();
+
+        // Get hidden king-role
+        var state = HideTheKing.Core.HideTheKingManager.Instance
+            .GetHiddenState(isWhite);
+
+        if (state == null || state.HiddenTarget != this)
+            return potential; // This is NOT the hidden piece → normal moves allowed
+
+        foreach (var move in potential)
+        {
+            // simulate the move
+            Piece captured = board[move.x, move.y];
+            board[position.x, position.y] = null;
+            board[move.x, move.y] = this;
+            Vector2Int old = position;
+            position = move;
+
+            // CHECK IF THIS NEW POSITION IS ATTACKED
+            bool inDanger = HideTheKing.Core.HideTheKingManager.Instance
+                .IsPieceInCheck(this);
+
+            // undo
+            position = old;
+            board[old.x, old.y] = this;
+            board[move.x, move.y] = captured;
+
+            if (!inDanger)
+                safeMoves.Add(move);
+        }
+
+        return safeMoves;
+    }
+    
     public static bool IsInBounds(Vector2Int pos)
     {
         return pos.x >= 0 && pos.x < 8 && pos.y >= 0 && pos.y < 8;

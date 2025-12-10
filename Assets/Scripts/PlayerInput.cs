@@ -55,7 +55,7 @@ public class PlayerInput : MonoBehaviour
                 if (hitPiece != null && selectedPiece == null && hitPiece.isWhite == boardManager.isWhiteTurn)
                 {
                     selectedPiece = hitPiece;
-                    
+
                     // Only check HideTheKingManager in HideTheKing scenes
                     if (SceneManager.GetActiveScene().name.Contains("HideTheKingGameMode"))
                     {
@@ -71,7 +71,7 @@ public class PlayerInput : MonoBehaviour
                             }
                         }
                     }
-                    
+
                     //Debug.Log(selectedPiece.type + " has a Y of: " + selectedPiece.transform.position.y);
                     ShowPossibleMoves();
                     return;
@@ -86,7 +86,17 @@ public class PlayerInput : MonoBehaviour
                         int targetRow = targetIndex / 8;
                         int targetCol = targetIndex % 8;
                         Vector2Int target = new Vector2Int(targetRow, targetCol);
-                        if (selectedPiece.GetLegalMovesWithCheckValidation(boardManager.boardPieces).Contains(target))
+                        
+                        // Use HTK moves if in HideTheKing mode and this piece is selected via HideTheKing logic
+                        List<Vector2Int> validMoves = selectedPiece.GetLegalMovesWithCheckValidation(boardManager.boardPieces);
+                        
+                        // If HideTheKing mode is on, additionally validate using HTK method
+                        if (HideTheKing.Core.HideTheKingManager.HideTheKingMode)
+                        {
+                            validMoves = selectedPiece.GetLegalMovesHTK(boardManager.boardPieces);
+                        }
+                        
+                        if (validMoves.Contains(target))
                         {
                             MovePiece(target);
                             boardManager.isWhiteTurn = !boardManager.isWhiteTurn; // Switch turns
@@ -115,6 +125,13 @@ public class PlayerInput : MonoBehaviour
     {
         ClearHighlights();
         List<Vector2Int> moves = selectedPiece.GetLegalMovesWithCheckValidation(boardManager.boardPieces);
+        
+        // If HideTheKing mode is on, use HTK filtering instead
+        if (HideTheKing.Core.HideTheKingManager.HideTheKingMode)
+        {
+            moves = selectedPiece.GetLegalMovesHTK(boardManager.boardPieces);
+        }
+        
         foreach (var move in moves)
         {
             int index = move.x * 8 + move.y;
@@ -381,7 +398,7 @@ public class PlayerInput : MonoBehaviour
 
         Debug.Log("Pawn promoted to " + randomType + "!");
     }
-    
+
     private void ShowPossibleMovesHTK()
     {
         ClearHighlights();
@@ -390,7 +407,7 @@ public class PlayerInput : MonoBehaviour
         foreach (var move in safeMoves)
         {
             int index = move.x * 8 + move.y;
-            Vector3 pos = boardManager.squares[index].position 
+            Vector3 pos = boardManager.squares[index].position
                           + new Vector3(-0.5f, highlightPrefab.transform.position.y, +0.5f);
 
             GameObject hl = Instantiate(highlightPrefab, pos, Quaternion.identity);

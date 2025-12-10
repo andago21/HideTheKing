@@ -33,8 +33,6 @@ public class Piece : MonoBehaviour
         List<Vector2Int> potentialMoves = GetLegalMoves(board);
         List<Vector2Int> legalMoves = new List<Vector2Int>();
         
-        Vector2Int originalPosition = position; // Save original position
-        
         foreach (Vector2Int move in potentialMoves)
         {
             // Simulate the move
@@ -52,10 +50,7 @@ public class Piece : MonoBehaviour
             board[oldPos.x, oldPos.y] = this;
             board[move.x, move.y] = capturedPiece;
             
-            if (!wouldBeInCheck)
-            {
-                legalMoves.Add(move);
-            }
+            if (!wouldBeInCheck) legalMoves.Add(move);
         }
         
         return legalMoves;
@@ -63,39 +58,14 @@ public class Piece : MonoBehaviour
     
     public List<Vector2Int> GetLegalMovesHTK(Piece[,] board)
     {
-        List<Vector2Int> potential = GetLegalMoves(board);
-        List<Vector2Int> safeMoves = new List<Vector2Int>();
-
-        // Get hidden king-role
-        var state = HideTheKing.Core.HideTheKingManager.Instance
-            .GetHiddenState(isWhite);
-
-        if (state == null || state.HiddenTarget != this)
-            return potential; // This is NOT the hidden piece → normal moves allowed
-
-        foreach (var move in potential)
+        var htkManager = HideTheKing.Core.HideTheKingManager.Instance;
+        if (htkManager != null)
         {
-            // simulate the move
-            Piece captured = board[move.x, move.y];
-            board[position.x, position.y] = null;
-            board[move.x, move.y] = this;
-            Vector2Int old = position;
-            position = move;
-
-            // CHECK IF THIS NEW POSITION IS ATTACKED
-            bool inDanger = HideTheKing.Core.HideTheKingManager.Instance
-                .IsPieceInCheck(this);
-
-            // undo
-            position = old;
-            board[old.x, old.y] = this;
-            board[move.x, move.y] = captured;
-
-            if (!inDanger)
-                safeMoves.Add(move);
+            return htkManager.GetLegalMovesHTK(this, board);
         }
-
-        return safeMoves;
+        
+        // Fallback: if manager is not available, return base moves
+        return GetLegalMovesWithCheckValidation(board);
     }
     
     public static bool IsInBounds(Vector2Int pos)

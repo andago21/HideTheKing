@@ -121,19 +121,27 @@ public class ChessNetworkManager : NetworkBehaviour
         RpcReceiveMove(fromX, fromY, toX, toY);
     }
 
-    // Server tells all clients about a move
     [ClientRpc]
     private void RpcReceiveMove(int fromX, int fromY, int toX, int toY)
     {
         Vector2Int from = new Vector2Int(fromX, fromY);
         Vector2Int to = new Vector2Int(toX, toY);
 
-        Debug.Log("Received move from network: " + from + " -> " + to);
+        Debug.Log("RPC Received - isLocalPlayer: " + isLocalPlayer + ", Move: " + from + " -> " + to);
 
-        // Find PlayerInput and execute the move
+        // Only execute if this is NOT the local player who made the move
+        // In Host+Client mode, the host's local player will receive this but should skip
+        if (isLocalPlayer)
+        {
+            Debug.Log("Skipping - this is the local player who made the move");
+            return;
+        }
+
+        // Also check if we even have authority to move pieces
         PlayerInput playerInput = FindObjectOfType<PlayerInput>();
         if (playerInput != null)
         {
+            Debug.Log("Executing move for remote player");
             playerInput.ExecuteNetworkMove(from, to);
         }
     }

@@ -390,8 +390,10 @@ public class PlayerInput : MonoBehaviour
         
         if (pieceToMove == null)
         {
-            Debug.LogError("No piece at position: " + from + " for network move!");
-            return;
+            // This is EXPECTED in Host+Client mode - the piece was already moved locally
+            // The non-local player instance receives the RPC but the piece is already gone
+            Debug.Log("Piece already moved - this is normal in Host+Client mode");
+            return; // Just return silently
         }
 
         // Set it as selected

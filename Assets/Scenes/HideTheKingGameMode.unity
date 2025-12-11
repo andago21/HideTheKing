@@ -15032,13 +15032,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1025389793}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.40547854, y: -0.7067501, z: -0.022457434, w: 0.5792988}
+  m_LocalRotation: {x: -0.36358216, y: -0.7751208, z: 0.033968523, w: 0.5155986}
   m_LocalPosition: {x: 633, y: -298, z: -290}
-  m_LocalScale: {x: 7.1899996, y: 7.1899996, z: 7.1899996}
+  m_LocalScale: {x: 0.6, y: 0.6, z: 0.6}
   m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 1209763916}
-  m_LocalEulerAnglesHint: {x: -36.81, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: -18.8, y: -119.49, z: 39.228}
 --- !u!199 &1025389795
 ParticleSystemRenderer:
   serializedVersion: 6
@@ -15060,7 +15060,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10308, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 10306, guid: 0000000000000000f000000000000000, type: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -15691,7 +15691,7 @@ ParticleSystem:
     gravityModifier:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 1
+      scalar: 0.22
       minScalar: 0
       maxCurve:
         serializedVersion: 2
@@ -21060,13 +21060,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1156776129}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.7028162, y: -0.44963238, z: -0.54573876, w: 0.07777795}
-  m_LocalPosition: {x: -614, y: -298, z: -290}
-  m_LocalScale: {x: 7.1899996, y: 7.1899996, z: 7.1899996}
+  m_LocalRotation: {x: -0.72525346, y: -0.5006124, z: -0.45984256, w: 0.10926846}
+  m_LocalPosition: {x: -614, y: -297.99997, z: -290.00006}
+  m_LocalScale: {x: 0.6, y: 0.6, z: 0.6}
   m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 1209763916}
-  m_LocalEulerAnglesHint: {x: -134.2, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: -141.764, y: -45.22699, z: -52.799988}
 --- !u!199 &1156776131
 ParticleSystemRenderer:
   serializedVersion: 6
@@ -21088,7 +21088,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10308, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 10306, guid: 0000000000000000f000000000000000, type: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -21719,7 +21719,7 @@ ParticleSystem:
     gravityModifier:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 1
+      scalar: 0.22
       minScalar: 0
       maxCurve:
         serializedVersion: 2
@@ -26124,7 +26124,7 @@ Canvas:
   m_GameObject: {fileID: 1209763915}
   m_Enabled: 1
   serializedVersion: 3
-  m_RenderMode: 0
+  m_RenderMode: 1
   m_Camera: {fileID: 1914331745}
   m_PlaneDistance: 5
   m_PixelPerfect: 0
@@ -26652,7 +26652,7 @@ Canvas:
   m_GameObject: {fileID: 1327639263}
   m_Enabled: 1
   serializedVersion: 3
-  m_RenderMode: 0
+  m_RenderMode: 1
   m_Camera: {fileID: 1914331745}
   m_PlaneDistance: 5
   m_PixelPerfect: 0
@@ -32453,7 +32453,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &1540594216
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -32503,7 +32503,7 @@ Canvas:
   m_GameObject: {fileID: 1540594215}
   m_Enabled: 1
   serializedVersion: 3
-  m_RenderMode: 0
+  m_RenderMode: 1
   m_Camera: {fileID: 1914331745}
   m_PlaneDistance: 5
   m_PixelPerfect: 0
@@ -33000,7 +33000,7 @@ Canvas:
   m_GameObject: {fileID: 1648653065}
   m_Enabled: 1
   serializedVersion: 3
-  m_RenderMode: 0
+  m_RenderMode: 1
   m_Camera: {fileID: 1914331745}
   m_PlaneDistance: 5
   m_PixelPerfect: 0

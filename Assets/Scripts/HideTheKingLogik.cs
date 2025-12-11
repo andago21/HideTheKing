@@ -18,7 +18,6 @@ namespace HideTheKing.Core
         private System.Random _rng = new System.Random();
         private Piece _hiddenTarget;
         private bool _hiddenIsWhite;
-        private bool _initialized;
 
         public void Initialize(
             IReadOnlyList<Piece> pieces,
@@ -38,10 +37,10 @@ namespace HideTheKing.Core
                 .ToList();
 
             if (pool.Count == 0)
-                throw new InvalidOperationException("Hide The King Role not detected: No valid pieces available for selection.");
+                throw new InvalidOperationException(
+                    "Hide The King Role not detected: No valid pieces available for selection.");
 
             _hiddenTarget = pool[_rng.Next(pool.Count)];
-            _initialized = true;
         }
 
         public bool ReportCapture(Piece captured, bool capturingIsWhite)
@@ -54,7 +53,7 @@ namespace HideTheKing.Core
 
             return false;
         }
-        
+
         public HiddenTargetStateGeneric Snapshot()
         {
             return new HiddenTargetStateGeneric
@@ -66,8 +65,7 @@ namespace HideTheKing.Core
 
         public static PieceSide GetSide(Piece piece)
         {
-            if (piece == null)
-                return PieceSide.None;
+            if (piece == null) return PieceSide.None;
 
             if (piece.type != PieceType.Rook &&
                 piece.type != PieceType.Bishop &&
@@ -76,7 +74,6 @@ namespace HideTheKing.Core
 
             // position.y is the column (0 = file a, 7 = file h)
             int col = piece.position.y;
-
             return col <= 3 ? PieceSide.Left : PieceSide.Right;
         }
 
@@ -85,9 +82,9 @@ namespace HideTheKing.Core
             var side = GetSide(piece);
             switch (side)
             {
-                case PieceSide.Left:  return "Left";
+                case PieceSide.Left: return "Left";
                 case PieceSide.Right: return "Right";
-                default:              return "Center";
+                default: return "Center";
             }
         }
     }

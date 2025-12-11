@@ -64,8 +64,8 @@ public class MoveNotation : MonoBehaviour
             // For pawn captures, add starting file
             if (piece.type == PieceType.Pawn && isCapture) notation += (char)('a' + from.y);
 
-            // Capture symbol
-            if (isCapture || isEnPassant) notation += "x";
+            // Replace 'x' with 'captures' for better clarity
+            if (isCapture || isEnPassant) notation += " captures ";
 
             notation += PositionToAlgebraic(to);
 
@@ -86,15 +86,29 @@ public class MoveNotation : MonoBehaviour
     }
 
     // Record a move in the move history
-    public void RecordMove(string moveNotation, bool isWhiteMove)
+    public void RecordMove(string moveNotation, bool isWhiteMove, bool isCapture = false)
     {
         string playerColor = isWhiteMove ? "White" : "Black";
-        moveHistory.Add(moveNotation);
+
+        string arrowNotation = "";
+        int arrowIndex = moveNotation.LastIndexOf("(");
+        if (arrowIndex != -1)
+        {
+            arrowNotation = moveNotation.Substring(arrowIndex + 1, moveNotation.Length - arrowIndex - 2); // Extract content between ( )
+        }
+
+        // Format the move for better readability
+        string formattedMove = isCapture
+            ? $"{playerColor} Move, Capture({arrowNotation})\n"
+            : $"{playerColor} Move: {arrowNotation}\n";
+
+        moveHistory.Add(formattedMove);
 
         // Trigger UI update
         OnMoveAdded?.Invoke();
 
-        Debug.Log(playerColor + ": " + moveNotation);
+        // Log the formatted move for debugging
+        Debug.Log(formattedMove);
     }
 
     // For checking threefold repetition (considers castling rights and en passant availability)

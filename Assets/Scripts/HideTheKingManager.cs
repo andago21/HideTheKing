@@ -14,6 +14,8 @@ namespace HideTheKing.Core
         private HiddenTargetLogicGeneric _blackLogic;
         private bool _gameOverTriggered;
         private GameRules _gameRules;
+        
+        public static bool HideTheKingMode = true;
 
         // Track check warnings so they don’t spam
         private bool whiteHiddenInCheck = false;
@@ -67,37 +69,26 @@ namespace HideTheKing.Core
         //  DETECT IF THE HIDDEN PIECE IS IN CHECK
         private void CheckHiddenTargetCheckState()
         {
-            // WHITE hidden king-role
-            var whiteState = _whiteLogic?.Snapshot();
-            if (whiteState != null && whiteState.HiddenTarget != null && whiteState.HiddenTarget.enabled)
-            {
-                bool nowInCheck = IsPieceInCheck(whiteState.HiddenTarget);
+            CheckHiddenCheckWarning(_whiteLogic?.Snapshot(), ref whiteHiddenInCheck, "White");
+            CheckHiddenCheckWarning(_blackLogic?.Snapshot(), ref blackHiddenInCheck, "Black");
+        }
 
-                if (nowInCheck && !whiteHiddenInCheck)
-                {
-                    whiteHiddenInCheck = true;
-                    Debug.Log("[HideTheKing] WARNING! White's hidden figure is IN CHECK!");
-                }
-                else if (!nowInCheck)whiteHiddenInCheck = false;
-            }
+        private void CheckHiddenCheckWarning(HiddenTargetStateGeneric state, ref bool wasInCheck, string colorName)
+        {
+            if (state?.HiddenTarget == null || !state.HiddenTarget.enabled) return;
 
-            // BLACK hidden king-role
-            var blackState = _blackLogic?.Snapshot();
-            if (blackState != null && blackState.HiddenTarget != null && blackState.HiddenTarget.enabled)
+            bool nowInCheck = IsPieceInCheck(state.HiddenTarget);
+            if (nowInCheck && !wasInCheck)
             {
-                bool nowInCheck = IsPieceInCheck(blackState.HiddenTarget);
-                if (nowInCheck && !blackHiddenInCheck)
-                {
-                    blackHiddenInCheck = true;
-                    Debug.Log("[HideTheKing] WARNING! Black's hidden figure is IN CHECK!");
-                }
-                else if (!nowInCheck) blackHiddenInCheck = false;
+                wasInCheck = true;
+                Debug.Log($"[HideTheKing] {colorName}'s hidden figure is IN CHECK!");
             }
+            else if (!nowInCheck) wasInCheck = false;
         }
 
 
         // Check if an enemy piece attacks the hidden role’s square
-        private bool IsPieceInCheck(Piece target)
+        public bool IsPieceInCheck(Piece target)
         {
             Piece[,] board = _gameRules.boardManager.boardPieces;
             Vector2Int targetPos = target.position;
@@ -201,6 +192,78 @@ namespace HideTheKing.Core
         public HiddenTargetStateGeneric GetHiddenState(bool forWhite)
         {
             return forWhite ? _whiteLogic?.Snapshot() : _blackLogic?.Snapshot();
+        }
+
+        // Validates moves considering king check
+        private bool IsMoveValid(Piece piece, Vector2Int from, Vector2Int to, Piece[,] board, Piece optionalHiddenTarget = null)
+        {
+            Piece captured = board[to.x, to.y];
+            bool wasCapturedEnabled = captured?.enabled ?? false;
+
+            // Simulate move
+            board[from.x, from.y] = null;
+            board[to.x, to.y] = piece;
+            piece.position = to;
+            if (captured != null) captured.enabled = false;
+
+            // Check own king
+            bool ownKingInCheck = Piece.IsKingInCheck(board, piece.isWhite);
+
+            // Check hidden target if provided
+            bool hiddenInCheck = false;
+            if (optionalHiddenTarget != null)
+            {
+                HideTheKingMode = false;
+                hiddenInCheck = IsPieceInCheck(optionalHiddenTarget);
+                HideTheKingMode = true;
+            }
+
+            // Restore board
+            piece.position = from;
+            board[from.x, from.y] = piece;
+            board[to.x, to.y] = captured;
+            if (captured != null) captured.enabled = wasCapturedEnabled;
+
+            return !ownKingInCheck && !hiddenInCheck;
+        }
+
+        // GET LEGAL MOVES FOR HTK - filters moves to only those that get hidden figure out of check
+        public List<Vector2Int> GetLegalMovesHTK(Piece piece, Piece[,] board = null)
+        {
+            if (piece == null) return new List<Vector2Int>();
+
+            board = board ?? _gameRules?.boardManager?.boardPieces;
+            if (board == null) return new List<Vector2Int>();
+
+            // Get base moves without HTK filtering to avoid recursion
+            bool prevHideMode = HideTheKingMode;
+            HideTheKingMode = false;
+            List<Vector2Int> baseMoves = piece.GetLegalMoves(board) ?? new List<Vector2Int>();
+            HideTheKingMode = prevHideMode;
+
+            if (!prevHideMode) return baseMoves;
+
+            var state = piece.isWhite ? _whiteLogic?.Snapshot() : _blackLogic?.Snapshot();
+            Piece hiddenTarget = state?.HiddenTarget;
+            
+            if (hiddenTarget == null || !hiddenTarget.enabled) return baseMoves;
+
+            // Check if hidden target is in check
+            HideTheKingMode = false;
+            bool isHiddenInCheck = IsPieceInCheck(hiddenTarget);
+            HideTheKingMode = prevHideMode;
+
+            // Filter moves based on hidden target state
+            var validMoves = new List<Vector2Int>();
+            foreach (var move in baseMoves)
+            {
+                if (IsMoveValid(piece, piece.position, move, board, isHiddenInCheck ? hiddenTarget : null))
+                {
+                    validMoves.Add(move);
+                }
+            }
+
+            return validMoves;
         }
     }
 }

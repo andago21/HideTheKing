@@ -33,8 +33,6 @@ public class Piece : MonoBehaviour
         List<Vector2Int> potentialMoves = GetLegalMoves(board);
         List<Vector2Int> legalMoves = new List<Vector2Int>();
         
-        Vector2Int originalPosition = position; // Save original position
-        
         foreach (Vector2Int move in potentialMoves)
         {
             // Simulate the move
@@ -52,13 +50,22 @@ public class Piece : MonoBehaviour
             board[oldPos.x, oldPos.y] = this;
             board[move.x, move.y] = capturedPiece;
             
-            if (!wouldBeInCheck)
-            {
-                legalMoves.Add(move);
-            }
+            if (!wouldBeInCheck) legalMoves.Add(move);
         }
         
         return legalMoves;
+    }
+    
+    public List<Vector2Int> GetLegalMovesHTK(Piece[,] board)
+    {
+        var htkManager = HideTheKing.Core.HideTheKingManager.Instance;
+        if (htkManager != null)
+        {
+            return htkManager.GetLegalMovesHTK(this, board);
+        }
+        
+        // Fallback: if manager is not available, return base moves
+        return GetLegalMovesWithCheckValidation(board);
     }
     
     public static bool IsInBounds(Vector2Int pos)

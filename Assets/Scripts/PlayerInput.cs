@@ -36,13 +36,21 @@ public class PlayerInput : MonoBehaviour
         }
     }
 
-
     void Update()
     {
         // Don't allow input if game is over
         if (boardManager.gameState != GameState.Playing)
         {
             return;
+        }
+
+        // Don't allow input if it's not your turn in multiplayer
+        if (ChessNetworkManager.LocalInstance != null)
+        {
+            if (!ChessNetworkManager.LocalInstance.IsMyTurn())
+            {
+                return;
+            }
         }
 
         if (Input.GetMouseButtonDown(0))
@@ -283,6 +291,13 @@ public class PlayerInput : MonoBehaviour
         );
 
         moveNotation.RecordMove(notation, boardManager.isWhiteTurn);
+
+        // Send move to network if in multiplayer
+        if (ChessNetworkManager.LocalInstance != null && ChessNetworkManager.LocalInstance.IsMultiplayer())
+        {
+            Debug.Log("Sending move to network: " + originalPosition + " -> " + target);
+            ChessNetworkManager.LocalInstance.SendMove(originalPosition, target);
+        }
         
         // Check all game-ending conditions
         gameRules.CheckGameEndConditions(boardManager.isWhiteTurn);
@@ -362,5 +377,33 @@ public class PlayerInput : MonoBehaviour
         }
 
         Debug.Log("Pawn promoted to " + randomType + "!");
+    }
+
+
+    // Called when receiving a move from the network
+    public void ExecuteNetworkMove(Vector2Int from, Vector2Int to)
+    {
+        Debug.Log("Executing network move: " + from + " -> " + to);
+        
+        // Find the piece at the 'from' position
+        Piece pieceToMove = boardManager.boardPieces[from.x, from.y];
+        
+        if (pieceToMove == null)
+        {
+            Debug.LogError("No piece at position: " + from + " for network move!");
+            return;
+        }
+
+        // Set it as selected
+        selectedPiece = pieceToMove;
+        
+        // Execute the move
+        MovePiece(to);
+        
+        // Switch turns
+        boardManager.isWhiteTurn = !boardManager.isWhiteTurn;
+        
+        // Clear selection
+        ClearSelection();
     }
 }

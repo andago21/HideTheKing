@@ -7,7 +7,6 @@ TagManager:
   - Square
   - Piece
   - BoardManager
-  - ChessNetworkManager
   layers:
   - Default
   - TransparentFX

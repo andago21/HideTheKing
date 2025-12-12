@@ -36,21 +36,13 @@ public class PlayerInput : MonoBehaviour
         }
     }
 
+
     void Update()
     {
         // Don't allow input if game is over
         if (boardManager.gameState != GameState.Playing)
         {
             return;
-        }
-
-        // Don't allow input if it's not your turn in multiplayer
-        if (ChessNetworkManager.LocalInstance != null)
-        {
-            if (!ChessNetworkManager.LocalInstance.IsMyTurn())
-            {
-                return;
-            }
         }
 
         if (Input.GetMouseButtonDown(0))
@@ -136,16 +128,13 @@ public class PlayerInput : MonoBehaviour
                 Piece capturedPawn = boardManager.boardPieces[capturedPawnPos.x, capturedPawnPos.y];
                 if (capturedPawn != null)
                 {
-                    // Move captured pawn to graveyard instead of destroying
+                    Destroy(capturedPawn.gameObject);
                     boardManager.boardPieces[capturedPawnPos.x, capturedPawnPos.y] = null;
-
                     if (captureEffectPrefab != null)
                     {
                         Vector3 capturePos = boardManager.squares[capturedPawnPos.x * 8 + capturedPawnPos.y].position;
                         Instantiate(captureEffectPrefab, capturePos, Quaternion.identity);
                     }
-
-                    boardManager.SendToSide(capturedPawn);
                 }
             }
         }
@@ -203,15 +192,13 @@ public class PlayerInput : MonoBehaviour
         // Capture
         if (targetPiece != null)
         {
-            // Move captured target to graveyard
+            Destroy(targetPiece.gameObject);
             if (captureEffectPrefab != null) Instantiate(captureEffectPrefab, targetPos, Quaternion.identity);
-            boardManager.SendToSide(targetPiece);
         }
         else
         {
             if (moveEffectPrefab != null) Instantiate(moveEffectPrefab, targetPos, Quaternion.identity);
         }
-
 
 
         // Check if pawn moved two squares (enable en passant for next turn)
@@ -292,13 +279,8 @@ public class PlayerInput : MonoBehaviour
 
         moveNotation.RecordMove(notation, boardManager.isWhiteTurn);
 
-        // Send move to network if in multiplayer
-        if (ChessNetworkManager.LocalInstance != null && ChessNetworkManager.LocalInstance.IsMultiplayer())
-        {
-            Debug.Log("Sending move to network: " + originalPosition + " -> " + target);
-            ChessNetworkManager.LocalInstance.SendMove(originalPosition, target);
-        }
-        
+
+
         // Check all game-ending conditions
         gameRules.CheckGameEndConditions(boardManager.isWhiteTurn);
     }
@@ -377,35 +359,5 @@ public class PlayerInput : MonoBehaviour
         }
 
         Debug.Log("Pawn promoted to " + randomType + "!");
-    }
-
-
-    // Called when receiving a move from the network
-    public void ExecuteNetworkMove(Vector2Int from, Vector2Int to)
-    {
-        Debug.Log("Executing network move: " + from + " -> " + to);
-        
-        // Find the piece at the 'from' position
-        Piece pieceToMove = boardManager.boardPieces[from.x, from.y];
-        
-        if (pieceToMove == null)
-        {
-            // This is EXPECTED in Host+Client mode - the piece was already moved locally
-            // The non-local player instance receives the RPC but the piece is already gone
-            Debug.Log("Piece already moved - this is normal in Host+Client mode");
-            return; // Just return silently
-        }
-
-        // Set it as selected
-        selectedPiece = pieceToMove;
-        
-        // Execute the move
-        MovePiece(to);
-        
-        // Switch turns
-        boardManager.isWhiteTurn = !boardManager.isWhiteTurn;
-        
-        // Clear selection
-        ClearSelection();
     }
 }

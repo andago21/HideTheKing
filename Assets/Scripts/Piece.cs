@@ -1,13 +1,12 @@
 using UnityEngine;
 using System.Collections.Generic;
-using HideTheKing.Core;
 
 public class Piece : MonoBehaviour
 {
     public bool isWhite; // true for white pieces, false for black
     public PieceType type; // Enum for pawn, rook, etc.
     public Vector2Int position; // Column (0-7 from bottom to top), Row (0-7 from a to h)
-    public bool hasMoved; // Track if piece has moved (for castling)
+    public bool hasMoved = false; // Track if piece has moved (for castling)
 
 
     /* 
@@ -32,6 +31,8 @@ public class Piece : MonoBehaviour
         List<Vector2Int> potentialMoves = GetLegalMoves(board);
         List<Vector2Int> legalMoves = new List<Vector2Int>();
         
+        Vector2Int originalPosition = position; // Save original position
+        
         foreach (Vector2Int move in potentialMoves)
         {
             // Simulate the move
@@ -49,21 +50,13 @@ public class Piece : MonoBehaviour
             board[oldPos.x, oldPos.y] = this;
             board[move.x, move.y] = capturedPiece;
             
-            if (!wouldBeInCheck) legalMoves.Add(move);
+            if (!wouldBeInCheck)
+            {
+                legalMoves.Add(move);
+            }
         }
         
         return legalMoves;
-    }
-    
-    public List<Vector2Int> GetLegalMovesHtk(Piece[,] board)
-    {
-        var htkManager = HideTheKingManager.Instance;
-        if (htkManager != null)
-        {
-            return htkManager.GetLegalMovesHTK(this, board);
-        }
-        // Fallback: if manager is not available, return base moves
-        return GetLegalMovesWithCheckValidation(board);
     }
     
     public static bool IsInBounds(Vector2Int pos)
@@ -73,32 +66,9 @@ public class Piece : MonoBehaviour
 
     public static bool IsKingInCheck(Piece[,] board, bool isWhiteKing)
     {
-        // In HideTheKing mode, only the hidden king is protected; other kings can be captured like normal pieces
-        if (HideTheKingManager.HideTheKingMode)
-        {
-            var htkManager = HideTheKingManager.Instance;
-            if (htkManager != null)
-            {
-                var state = htkManager.GetHiddenState(isWhiteKing);
-                var hiddenTarget = state?.HiddenTarget;
-                if (hiddenTarget == null || !hiddenTarget.enabled) return false;
-                Vector2Int hiddenKingPos = hiddenTarget.position;
-                foreach (Piece piece in board)
-                {
-                    if (piece != null && piece.isWhite != isWhiteKing)
-                    {
-                        List<Vector2Int> opponentMoves = piece.GetLegalMoves(board);
-                        if (opponentMoves.Contains(hiddenKingPos))
-                        {
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            }
-        }
         Vector2Int kingPos = FindKing(board, isWhiteKing);
         if (kingPos.x == -1) return false; // King not found (error)
+
         foreach (Piece piece in board)
         {
             if (piece != null && piece.isWhite != isWhiteKing)
@@ -131,37 +101,13 @@ public class Piece : MonoBehaviour
 
     public static bool IsCheckmate(Piece[,] board, bool isWhiteKing)
     {
-        // In HideTheKing mode, only the hidden king is protected; other kings can be captured like normal pieces
-        if (HideTheKingManager.HideTheKingMode)
+        // First, check if the king is in check
+        if (!IsKingInCheck(board, isWhiteKing))
         {
-            var htkManager = HideTheKingManager.Instance;
-            if (htkManager != null)
-            {
-                var state = htkManager.GetHiddenState(isWhiteKing);
-                var hiddenTarget = state?.HiddenTarget;
-                if (hiddenTarget == null || !hiddenTarget.enabled) return false;
-                // Check if hidden king is in check
-                if (!IsKingInCheck(board, isWhiteKing)) return false;
-                // Check if any piece for this player has any legal moves (under HTK rules) that would avoid check
-                for (int row = 0; row < 8; row++)
-                {
-                    for (int col = 0; col < 8; col++)
-                    {
-                        Piece p = board[row, col];
-                        if (p != null && p.isWhite == isWhiteKing && p.enabled)
-                        {
-                            List<Vector2Int> legalMoves = htkManager.GetLegalMovesHTK(p, board);
-                            if (legalMoves != null && legalMoves.Count > 0)
-                            {
-                                return false; // Found a legal move, not checkmate
-                            }
-                        }
-                    }
-                }
-                 return true;
-            }
+            return false; // Not in check, so can't be checkmate
         }
-        if (!IsKingInCheck(board, isWhiteKing)) return false; // Not in check, so can't be checkmate
+
+        // King is in check - now check if there are ANY legal moves for this player
         for (int row = 0; row < 8; row++)
         {
             for (int col = 0; col < 8; col++)
@@ -170,50 +116,25 @@ public class Piece : MonoBehaviour
                 if (piece != null && piece.isWhite == isWhiteKing)
                 {
                     List<Vector2Int> legalMoves = piece.GetLegalMovesWithCheckValidation(board);
-                    if (legalMoves.Count > 0) return false; // Found a legal move, not checkmate
+                    if (legalMoves.Count > 0)
+                    {
+                        return false; // Found a legal move, not checkmate
+                    }
                 }
             }
         }
+
         return true; // No legal moves available, it's checkmate
     }
 
     public static bool IsStalemate(Piece[,] board, bool isWhitePlayer)
     {
-        // In HideTheKing mode, only the hidden king matters for stalemate; other kings can be captured like normal pieces
-        if (HideTheKingManager.HideTheKingMode)
-        {
-            var htkManager = HideTheKingManager.Instance;
-            if (htkManager != null)
-            {
-                var state = htkManager.GetHiddenState(isWhitePlayer);
-                var hiddenTarget = state?.HiddenTarget;
-                if (hiddenTarget == null || !hiddenTarget.enabled)
-                    return false;
-                // If hidden king is in check, not stalemate
-                if (IsKingInCheck(board, isWhitePlayer))
-                    return false;
-                // If ANY piece for this player has any legal moves (under HTK rules), it's not stalemate
-                for (int row = 0; row < 8; row++)
-                {
-                    for (int col = 0; col < 8; col++)
-                    {
-                        Piece p = board[row, col];
-                        if (p != null && p.isWhite == isWhitePlayer && p.enabled)
-                        {
-                            List<Vector2Int> legalMoves = htkManager.GetLegalMovesHTK(p, board);
-                            if (legalMoves != null && legalMoves.Count > 0)
-                                return false;
-                        }
-                    }
-                }
-                 return true; // No legal moves and not in check
-            }
-        }
         // First, check if the king is NOT in check
         if (IsKingInCheck(board, isWhitePlayer))
         {
             return false; // In check, so can't be stalemate
         }
+
         // King is safe - now check if there are ANY legal moves for this player
         for (int row = 0; row < 8; row++)
         {
@@ -230,6 +151,7 @@ public class Piece : MonoBehaviour
                 }
             }
         }
+
         return true; // No legal moves available and not in check meaning stalemate
     }
     

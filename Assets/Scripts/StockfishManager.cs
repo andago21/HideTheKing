@@ -14,9 +14,16 @@ public class StockfishManager : MonoBehaviour
     private StreamReader stockfishOutput;
 
     [Header("Engine Settings")]
-    [Tooltip("Difficulty level: 1 (easiest) to 20 (hardest)")]
+    [Tooltip("Use ELO rating instead of Skill Level")]
+    public bool useEloRating = false;
+
+    [Tooltip("Skill Level: 1 (easiest) to 20 (hardest) - used when useEloRating is false")]
     [Range(1, 20)]
     public int skillLevel = 10;
+
+    [Tooltip("ELO Rating: 1320 (beginner) to 3190 (master) - used when useEloRating is true")]
+    [Range(1320, 3190)]
+    public int eloRating = 1500;
 
     [Tooltip("Time limit in milliseconds for engine to think")]
     public int thinkingTimeMs = 1000;
@@ -91,8 +98,22 @@ public class StockfishManager : MonoBehaviour
 
             if (line == "uciok")
             {
-                // Set skill level
-                SendCommand($"setoption name Skill Level value {skillLevel}");
+                // Configure difficulty settings
+                if (useEloRating)
+                {
+                    // Use ELO rating mode
+                    SendCommand("setoption name UCI_LimitStrength value true");
+                    SendCommand($"setoption name UCI_Elo value {eloRating}");
+                    Debug.Log($"Stockfish difficulty set to ELO {eloRating}");
+                }
+                else
+                {
+                    // Use Skill Level mode
+                    SendCommand("setoption name UCI_LimitStrength value false");
+                    SendCommand($"setoption name Skill Level value {skillLevel}");
+                    Debug.Log($"Stockfish difficulty set to Skill Level {skillLevel}");
+                }
+            
                 SendCommand("isready");
             }
 
@@ -201,14 +222,34 @@ public class StockfishManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Set the difficulty level (1-20)
+    /// Set the difficulty using Skill Level (1-20)
     /// </summary>
     public void SetSkillLevel(int level)
     {
         skillLevel = Mathf.Clamp(level, 1, 20);
+        useEloRating = false;
+    
         if (isEngineReady)
         {
+            SendCommand("setoption name UCI_LimitStrength value false");
             SendCommand($"setoption name Skill Level value {skillLevel}");
+            Debug.Log($"Difficulty changed to Skill Level {skillLevel}");
+        }
+    }
+
+    /// <summary>
+    /// Set the difficulty using ELO Rating (1320-3190)
+    /// </summary>
+    public void SetEloRating(int elo)
+    {
+        eloRating = Mathf.Clamp(elo, 1320, 3190);
+        useEloRating = true;
+    
+        if (isEngineReady)
+        {
+            SendCommand("setoption name UCI_LimitStrength value true");
+            SendCommand($"setoption name UCI_Elo value {eloRating}");
+            Debug.Log($"Difficulty changed to ELO {eloRating}");
         }
     }
 }

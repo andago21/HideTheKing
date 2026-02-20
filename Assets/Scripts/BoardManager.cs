@@ -52,6 +52,17 @@ public class BoardManager : MonoBehaviour
         }
         SetupBoard();
     }
+    
+    //TEMPORÄR TEST FÜR FENConverter
+    void Update()
+    {
+        // Press F to print FEN (for testing)
+        if (Input.GetKeyDown(KeyCode.F))
+        {
+            string fen = FENConverter.Instance.BoardToFEN();
+            Debug.Log("Current FEN: " + fen);
+        }
+    }
 
     void SetupBoard()
     {

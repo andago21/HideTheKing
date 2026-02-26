@@ -8,24 +8,20 @@ public class TutorialHighlight : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetMouseButtonDown(0))
+        if (!Input.GetMouseButtonDown(0)) return;
+        if (Camera.main == null) return;
+
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        if (!Physics.Raycast(ray, out RaycastHit hit, 100f)) return;
+
+        for (Transform t = hit.transform; t != null; t = t.parent)
         {
-            if (Camera.main == null) return;
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            if (Physics.Raycast(ray, out RaycastHit hit, 100f))
+            if (t == this.transform)
             {
-                // Check if the hit belongs to this highlight (or its children)
-                Transform t = hit.transform;
-                while (t != null)
-                {
-                    if (t == this.transform)
-                    {
-                        Debug.Log($"TutorialHighlight clicked (ray): index={index}, manager={(manager!=null?"present":"null")}");
-                        if (manager != null && index >= 0) manager.MoveTutorialRookToIndex(index);
-                        return;
-                    }
-                    t = t.parent;
-                }
+                var tm = manager ?? TutorialManager.Instance;
+                if (tm != null && index >= 0)
+                    tm.OnSquareClicked(index);
+                return;
             }
         }
     }

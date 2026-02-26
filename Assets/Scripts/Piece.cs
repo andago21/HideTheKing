@@ -65,6 +65,12 @@ public class Piece : MonoBehaviour
         // Fallback: if manager is not available, return base moves
         return GetLegalMovesWithCheckValidation(board);
     }
+
+    // Backwards-compatibility wrapper for callers using the HTK acronym in uppercase
+    public List<Vector2Int> GetLegalMovesHTK(Piece[,] board)
+    {
+        return GetLegalMovesHtk(board);
+    }
     
     public static bool IsInBounds(Vector2Int pos)
     {

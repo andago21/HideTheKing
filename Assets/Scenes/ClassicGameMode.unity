@@ -17005,8 +17005,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e92745c60632364ba318c1e22b5e96f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  useEloRating: 1
-  skillLevel: 20
+  useEloRating: 0
+  skillLevel: 10
   eloRating: 1320
   thinkingTimeMs: 1000
 --- !u!4 &1343874818
@@ -28975,7 +28975,7 @@ MonoBehaviour:
   playerInput: {fileID: 996436571}
   aiEnabled: 1
   aiPlaysBlack: 1
-  aiMoveDelay: 0
+  aiMoveDelay: 0.4
 --- !u!4 &1754926160
 Transform:
   m_ObjectHideFlags: 0

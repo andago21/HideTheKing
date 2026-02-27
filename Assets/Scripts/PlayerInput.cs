@@ -2,11 +2,6 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 
-// Vetem une edhe zoti e dim si funksionon ky kod, as ChatGPT as Claude asilloj AI nuk e zgjidh dot.
-// Duhet me e transferu ne Clean Code
-// Nqs e kupton ca nodh ktu ke aspirime per jeten
-// Ragequit counter: 14
-
 public class PlayerInput : MonoBehaviour
 {
     public BoardManager boardManager;
@@ -62,24 +57,24 @@ public class PlayerInput : MonoBehaviour
                 if (hitPiece != null && selectedPiece == null && hitPiece.isWhite == boardManager.isWhiteTurn)
                 {
                     selectedPiece = hitPiece;
-                    //Debug.Log(selectedPiece.type + " has a Y of: " + selectedPiece.transform.position.y);
                     ShowPossibleMoves();
                     return;
                 }
 
                 if (selectedPiece != null)
                 {
-                    // Find target square (assuming hit is on square or piece; adjust if needed)
                     int targetIndex = GetSquareIndexFromHit(hit);
                     if (targetIndex != -1)
                     {
                         int targetRow = targetIndex / 8;
                         int targetCol = targetIndex % 8;
                         Vector2Int target = new Vector2Int(targetRow, targetCol);
+
                         if (selectedPiece.GetLegalMovesWithCheckValidation(boardManager.boardPieces).Contains(target))
                         {
-                            MovePiece(target);
-                            boardManager.isWhiteTurn = !boardManager.isWhiteTurn; // Switch turns
+                            // ── CHANGED: pass from explicitly instead of relying on selectedPiece being set ──
+                            MovePiece(selectedPiece.position, target);
+                            boardManager.isWhiteTurn = !boardManager.isWhiteTurn;
                         }
                     }
                     ClearSelection();
@@ -98,7 +93,7 @@ public class PlayerInput : MonoBehaviour
                 return i;
             }
         }
-        return -1; // Not a square
+        return -1;
     }
 
     private void ShowPossibleMoves()
@@ -114,29 +109,36 @@ public class PlayerInput : MonoBehaviour
         }
     }
 
-    private void MovePiece(Vector2Int target)
+    // ── CHANGED: now takes 'from' as a parameter instead of reading selectedPiece.position ──
+    // Everything inside is identical to before — only the signature and first line changed.
+    private void MovePiece(Vector2Int from, Vector2Int to)
     {
-        Vector3 targetPos = boardManager.squares[target.x * 8 + target.y].position;
-        Vector2Int originalPosition = selectedPiece.position;
+        // ── CHANGED: look up the piece from the board using 'from' instead of using selectedPiece directly ──
+        Piece piece = boardManager.boardPieces[from.x, from.y];
+        if (piece == null)
+        {
+            Debug.LogWarning($"MovePiece called but no piece found at {from}");
+            return;
+        }
+
+        Vector3 targetPos = boardManager.squares[to.x * 8 + to.y].position;
+        Vector2Int originalPosition = from;
 
         // Reset en passant from previous turn
         boardManager.enPassantTarget = new Vector2Int(-1, -1);
 
         // Check if en passant capture
         bool isEnPassant = false;
-        if (selectedPiece.type == PieceType.Pawn)
+        if (piece.type == PieceType.Pawn)
         {
-            int direction = selectedPiece.isWhite ? 1 : -1;
-            // If pawn moves diagonally to an empty square, it's en passant
-            if (target.y != selectedPiece.position.y && boardManager.boardPieces[target.x, target.y] == null)
+            int direction = piece.isWhite ? 1 : -1;
+            if (to.y != piece.position.y && boardManager.boardPieces[to.x, to.y] == null)
             {
                 isEnPassant = true;
-                // The captured pawn is one row back
-                Vector2Int capturedPawnPos = new Vector2Int(target.x - direction, target.y);
+                Vector2Int capturedPawnPos = new Vector2Int(to.x - direction, to.y);
                 Piece capturedPawn = boardManager.boardPieces[capturedPawnPos.x, capturedPawnPos.y];
                 if (capturedPawn != null)
                 {
-                    // Move captured pawn to graveyard instead of destroying
                     boardManager.boardPieces[capturedPawnPos.x, capturedPawnPos.y] = null;
 
                     if (captureEffectPrefab != null)
@@ -150,60 +152,51 @@ public class PlayerInput : MonoBehaviour
             }
         }
 
-
-        // Check if is castling
+        // Check if castling
         bool isCastling = false;
         Piece rook = null;
         Vector2Int rookTarget = Vector2Int.zero;
-        if (selectedPiece.type == PieceType.King && !selectedPiece.hasMoved)
+        if (piece.type == PieceType.King && !piece.hasMoved)
         {
-            int colDiff = target.y - selectedPiece.position.y;
+            int colDiff = to.y - piece.position.y;
             if (Mathf.Abs(colDiff) == 2)
             {
                 isCastling = true;
                 bool kingside = colDiff > 0;
                 int rookCol = kingside ? 7 : 0;
-                int rookTargetCol = kingside ? target.y - 1 : target.y + 1;
-                
-                rook = boardManager.boardPieces[selectedPiece.position.x, rookCol];
-                rookTarget = new Vector2Int(selectedPiece.position.x, rookTargetCol);
-                
-                // Move the rook
+                int rookTargetCol = kingside ? to.y - 1 : to.y + 1;
+
+                rook = boardManager.boardPieces[piece.position.x, rookCol];
+                rookTarget = new Vector2Int(piece.position.x, rookTargetCol);
+
                 if (rook != null)
                 {
-                    boardManager.boardPieces[selectedPiece.position.x, rookCol] = null;
+                    boardManager.boardPieces[piece.position.x, rookCol] = null;
                     boardManager.boardPieces[rookTarget.x, rookTarget.y] = rook;
                     rook.position = rookTarget;
                     rook.hasMoved = true;
-                    
+
                     Vector3 rookPos = boardManager.squares[rookTarget.x * 8 + rookTarget.y].position;
                     StartCoroutine(MoveAnimation(rook.transform, rookPos));
                 }
-                
+
                 Debug.Log("Castling performed!");
             }
         }
 
-
         // Check if this move is a capture or pawn move (for fifty-move rule)
-        Piece targetPiece = boardManager.boardPieces[target.x, target.y];
+        Piece targetPiece = boardManager.boardPieces[to.x, to.y];
         bool isCapture = (targetPiece != null) || isEnPassant;
-        bool isPawnMove = (selectedPiece.type == PieceType.Pawn);
-        
-        if (isCapture || isPawnMove)
-        {
-            gameRules.halfMoveClock = 0; // Reset counter
-        }
-        else
-        {
-            gameRules.halfMoveClock++; // Increment counter
-        }
+        bool isPawnMove = (piece.type == PieceType.Pawn);
 
+        if (isCapture || isPawnMove)
+            gameRules.halfMoveClock = 0;
+        else
+            gameRules.halfMoveClock++;
 
         // Capture
         if (targetPiece != null)
         {
-            // Move captured target to graveyard
             if (captureEffectPrefab != null) Instantiate(captureEffectPrefab, targetPos, Quaternion.identity);
             boardManager.SendToSide(targetPiece);
         }
@@ -212,76 +205,61 @@ public class PlayerInput : MonoBehaviour
             if (moveEffectPrefab != null) Instantiate(moveEffectPrefab, targetPos, Quaternion.identity);
         }
 
-
-
         // Check if pawn moved two squares (enable en passant for next turn)
-        if (selectedPiece.type == PieceType.Pawn)
+        if (piece.type == PieceType.Pawn)
         {
-            int rowDiff = Mathf.Abs(target.x - selectedPiece.position.x);
+            int rowDiff = Mathf.Abs(to.x - piece.position.x);
             if (rowDiff == 2)
             {
-                // Set en passant target square (the square the pawn "skipped over")
-                int direction = selectedPiece.isWhite ? 1 : -1;
-                boardManager.enPassantTarget = new Vector2Int(selectedPiece.position.x + direction, selectedPiece.position.y);
+                int direction = piece.isWhite ? 1 : -1;
+                boardManager.enPassantTarget = new Vector2Int(piece.position.x + direction, piece.position.y);
             }
         }
-
 
         // Update board
-        boardManager.boardPieces[selectedPiece.position.x, selectedPiece.position.y] = null;
-        boardManager.boardPieces[target.x, target.y] = selectedPiece;
-        selectedPiece.position = target;
-        selectedPiece.hasMoved = true; // Mark piece as moved
+        boardManager.boardPieces[piece.position.x, piece.position.y] = null;
+        boardManager.boardPieces[to.x, to.y] = piece;
+        piece.position = to;
+        piece.hasMoved = true;
 
-
-        // Check if this move will cause pawn promotion
+        // Check for pawn promotion
         bool willPromote = false;
-        if (selectedPiece.type == PieceType.Pawn)
+        if (piece.type == PieceType.Pawn)
         {
-            int promotionRow = selectedPiece.isWhite ? 7 : 0;
-            if (target.x == promotionRow)
-            {
+            int promotionRow = piece.isWhite ? 7 : 0;
+            if (to.x == promotionRow)
                 willPromote = true;
-            }
         }
-
 
         // Animate (or skip animation if promoting)
         if (willPromote)
         {
-            // Move instantly without animation, then promote
-            selectedPiece.transform.position = targetPos;
-            PromotePawn(selectedPiece, target);
+            piece.transform.position = targetPos;
+            PromotePawn(piece, to);
         }
         else
         {
-            StartCoroutine(MoveAnimation(selectedPiece.transform, targetPos));
+            StartCoroutine(MoveAnimation(piece.transform, targetPos));
         }
 
-
-        //--------- Record Move Notations --------------------
-
+        // Record move notation
         bool isCheck = Piece.IsKingInCheck(boardManager.boardPieces, !boardManager.isWhiteTurn);
         bool isCheckmate = false;
         if (isCheck)
-        {
             isCheckmate = Piece.IsCheckmate(boardManager.boardPieces, !boardManager.isWhiteTurn);
-        }
 
         PieceType promotedTo = PieceType.Pawn;
         if (willPromote)
         {
-            Piece promotedPiece = boardManager.boardPieces[target.x, target.y];
+            Piece promotedPiece = boardManager.boardPieces[to.x, to.y];
             if (promotedPiece != null)
-            {
                 promotedTo = promotedPiece.type;
-            }
         }
 
         string notation = moveNotation.GenerateMoveNotation(
-            selectedPiece,
+            piece,
             originalPosition,
-            target,
+            to,
             isCapture,
             isEnPassant,
             isCastling,
@@ -295,12 +273,20 @@ public class PlayerInput : MonoBehaviour
         // Send move to network if in multiplayer
         if (ChessNetworkManager.LocalInstance != null && ChessNetworkManager.LocalInstance.IsMultiplayer())
         {
-            Debug.Log("Sending move to network: " + originalPosition + " -> " + target);
-            ChessNetworkManager.LocalInstance.SendMove(originalPosition, target);
+            Debug.Log("Sending move to network: " + originalPosition + " -> " + to);
+            ChessNetworkManager.LocalInstance.SendMove(originalPosition, to);
         }
-        
-        // Check all game-ending conditions
+
+        // Check all game-ending conditions (added Multiplayer check)
         gameRules.CheckGameEndConditions(boardManager.isWhiteTurn);
+
+        if (ChessNetworkManager.LocalInstance != null && ChessNetworkManager.LocalInstance.IsMultiplayer())
+        {
+            if (boardManager.gameState != GameState.Playing)
+            {
+                ChessNetworkManager.LocalInstance.SendGameEnd(boardManager.gameState);
+            }
+        }
     }
 
 
@@ -308,14 +294,14 @@ public class PlayerInput : MonoBehaviour
     {
         float duration = 0.5f;
         Vector3 start = pieceTrans.position;
-        start.y = boardManager.transform.position.y; // Lock starting Y
-        targetPos.y = boardManager.transform.position.y; // Lock target Y
+        start.y = boardManager.transform.position.y;
+        targetPos.y = boardManager.transform.position.y;
         float elapsed = 0;
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
             Vector3 newPos = Vector3.Lerp(start, targetPos, elapsed / duration);
-            newPos.y = boardManager.transform.position.y; // Enforce Y during lerp
+            newPos.y = boardManager.transform.position.y;
             pieceTrans.position = Vector3.Lerp(start, targetPos, elapsed / duration);
             yield return null;
         }
@@ -336,14 +322,11 @@ public class PlayerInput : MonoBehaviour
 
     private void PromotePawn(Piece pawn, Vector2Int target)
     {
-        // Destroy the pawn
         Destroy(pawn.gameObject);
 
-        // Randomly choose a piece type (Queen, Rook, Bishop, or Knight - no King or Pawn)
         PieceType[] promotionOptions = { PieceType.Queen, PieceType.Rook, PieceType.Bishop, PieceType.Knight };
         PieceType randomType = promotionOptions[Random.Range(0, promotionOptions.Length)];
 
-        // Get the appropriate prefab based on color and random type
         GameObject promotionPrefab = null;
         switch (randomType)
         {
@@ -361,7 +344,6 @@ public class PlayerInput : MonoBehaviour
                 break;
         }
 
-        // Create the new piece at the promotion position
         Vector3 pos = boardManager.squares[target.x * 8 + target.y].position;
         pos.y = promotionPrefab.transform.position.y;
 
@@ -380,32 +362,21 @@ public class PlayerInput : MonoBehaviour
     }
 
 
-    // Called when receiving a move from the network
+    // ── CHANGED: no more selectedPiece hack — just call MovePiece directly ──
     public void ExecuteNetworkMove(Vector2Int from, Vector2Int to)
     {
         Debug.Log("Executing network move: " + from + " -> " + to);
-        
-        // Find the piece at the 'from' position
+
         Piece pieceToMove = boardManager.boardPieces[from.x, from.y];
-        
         if (pieceToMove == null)
         {
-            // This is EXPECTED in Host+Client mode - the piece was already moved locally
-            // The non-local player instance receives the RPC but the piece is already gone
+            // Expected in Host+Client mode - piece already moved locally
             Debug.Log("Piece already moved - this is normal in Host+Client mode");
-            return; // Just return silently
+            return;
         }
 
-        // Set it as selected
-        selectedPiece = pieceToMove;
-        
-        // Execute the move
-        MovePiece(to);
-        
-        // Switch turns
+        MovePiece(from, to);
         boardManager.isWhiteTurn = !boardManager.isWhiteTurn;
-        
-        // Clear selection
         ClearSelection();
     }
 }

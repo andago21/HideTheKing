@@ -184,5 +184,12 @@ public class BoardManager : MonoBehaviour
         capturedPiece.transform.SetPositionAndRotation(targetPos, targetRot);
     }
 
+    public void HandleGameEnd(GameState result)
+    {
+        if (result == GameState.Playing) return;
+        
+        gameState = result;
+    }
+
     
 }

@@ -146,6 +146,43 @@ public class ChessNetworkManager : NetworkBehaviour
         }
     }
 
+    // Tells client to run the same check so everyone sees the result.
+    public void SendGameEnd(GameState result)
+    {
+        if (!NetworkClient.active && !NetworkServer.active)
+            return;
+
+        if (isServer)
+        {
+            // Host already has the result — just broadcast it to clients
+            RpcReceiveGameEnd((int)result);
+        }
+        else
+        {
+            // Client sends the result up to the server, server broadcasts
+            CmdSendGameEnd((int)result);
+        }
+    }
+
+    [Command(requiresAuthority = false)]
+    private void CmdSendGameEnd(int result)
+    {
+        RpcReceiveGameEnd(result);
+    }
+
+    [ClientRpc]
+    private void RpcReceiveGameEnd(int result)
+    {
+        Debug.Log("RpcReceiveGameEnd received: " + (GameState)result);
+
+        GameRules gameRules = FindObjectOfType<GameRules>();
+        if (gameRules != null)
+        {
+            // Trigger the same game-end logic on every client
+            boardManager.HandleGameEnd((GameState)result);
+        }
+    }
+
     // Check if it's this player's turn
     public bool IsMyTurn()
     {

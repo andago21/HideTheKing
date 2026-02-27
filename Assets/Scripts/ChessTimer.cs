@@ -8,65 +8,62 @@ public class ChessTimer : MonoBehaviour
     public float whiteTimeRemaining;
     public float blackTimeRemaining;
     
-    private float gameDuration; // Total time for each player in seconds
+    private float gameDuration;
     private bool timerActive = false;
 
-    //Displaying the timer in console (Will be replaced with UI later)
-    private float displayInterval = 5f; // Display every 5 seconds
+    private float displayInterval = 5f;
     private float nextDisplayTime = 0f;
-
 
     private void Awake()
     {
         gameRules = GetComponent<GameRules>();
         if (gameRules == null)
-        {
             Debug.LogError("GameRules component not found on BoardManager!");
-        }
     }
 
     private void Start()
     {
-        InitializeTimer();
+        // CHANGED: no longer auto-starts. 
+        // In singleplayer, StartTimer() is called immediately.
+        // In multiplayer, StartTimer() is called once both players are connected.
+        if (!Mirror.NetworkClient.active && !Mirror.NetworkServer.active)
+        {
+            StartTimer(); // Singleplayer: start immediately
+        }
+        // Multiplayer: LobbyConnector will call StartTimer() via RPC when both players are in
     }
 
-    private void InitializeTimer()
+    public void StartTimer()
     {
-        // Randomly choose between 3/5 minute game
-        int randomMinutes = Random.Range(0, 2) == 0 ? 3 : 5;
-        gameDuration = randomMinutes * 60f; // Convert to seconds
-        
+        int randomMinutes = Random.Range(0, 2) == 0 ? 5 : 10;
+        gameDuration = randomMinutes * 60f;
+
         whiteTimeRemaining = gameDuration;
         blackTimeRemaining = gameDuration;
-        
+
         timerActive = true;
-        
-        Debug.Log("Chess Timer initialized: " + randomMinutes + " minutes per player");
+
+        Debug.Log("Chess Timer started: " + randomMinutes + " minutes per player");
     }
 
     private void Update()
     {
         if (!timerActive || boardManager.gameState != GameState.Playing)
-        {
             return;
-        }
 
-        // Display timer periodically (optional, for debugging)
         if (Time.time >= nextDisplayTime)
         {
-            //Debug.Log("White: " + GetFormattedTime(true) + " | Black: " + GetFormattedTime(false));
+            Debug.Log("White: " + GetFormattedTime(true) + " | Black: " + GetFormattedTime(false));
             nextDisplayTime = Time.time + displayInterval;
         }
 
-
-        // Decrease time for the current player
         if (boardManager.isWhiteTurn)
         {
             whiteTimeRemaining -= Time.deltaTime;
             if (whiteTimeRemaining <= 0)
             {
                 whiteTimeRemaining = 0;
-                OnTimeOut(true); // White ran out of time
+                OnTimeOut(true);
             }
         }
         else
@@ -75,7 +72,7 @@ public class ChessTimer : MonoBehaviour
             if (blackTimeRemaining <= 0)
             {
                 blackTimeRemaining = 0;
-                OnTimeOut(false); // Black ran out of time
+                OnTimeOut(false);
             }
         }
     }
@@ -83,7 +80,7 @@ public class ChessTimer : MonoBehaviour
     private void OnTimeOut(bool isWhiteTimeout)
     {
         timerActive = false;
-        
+
         if (isWhiteTimeout)
         {
             Debug.Log("White ran out of time! Black wins by timeout.");
@@ -96,7 +93,6 @@ public class ChessTimer : MonoBehaviour
         }
     }
 
-    // Get formatted time string (MM:SS)
     public string GetFormattedTime(bool isWhite)
     {
         float timeRemaining = isWhite ? whiteTimeRemaining : blackTimeRemaining;
@@ -105,18 +101,14 @@ public class ChessTimer : MonoBehaviour
         return string.Format("{0:00}:{1:00}", minutes, seconds);
     }
 
-    // Stop the timer (useful when game ends)
     public void StopTimer()
     {
         timerActive = false;
     }
 
-    // Resume the timer
     public void ResumeTimer()
     {
         if (boardManager.gameState == GameState.Playing)
-        {
             timerActive = true;
-        }
     }
 }

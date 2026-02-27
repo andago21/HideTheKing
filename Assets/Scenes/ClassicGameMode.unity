@@ -13483,8 +13483,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: VICTORY!
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: d0fbd3f5cf107d74ab681d4cf82336dc, type: 2}
-  m_sharedMaterial: {fileID: 7277075528710576988, guid: d0fbd3f5cf107d74ab681d4cf82336dc, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -15610,7 +15610,7 @@ Canvas:
   m_GameObject: {fileID: 1047996316}
   m_Enabled: 1
   serializedVersion: 3
-  m_RenderMode: 0
+  m_RenderMode: 1
   m_Camera: {fileID: 1721989364}
   m_PlaneDistance: 5
   m_PixelPerfect: 0
@@ -17136,8 +17136,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: 'Black Pieces Captured: 0'
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: d0fbd3f5cf107d74ab681d4cf82336dc, type: 2}
-  m_sharedMaterial: {fileID: 7277075528710576988, guid: d0fbd3f5cf107d74ab681d4cf82336dc, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -22317,8 +22317,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: 'White Pieces Captured: 0'
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: d0fbd3f5cf107d74ab681d4cf82336dc, type: 2}
-  m_sharedMaterial: {fileID: 7277075528710576988, guid: d0fbd3f5cf107d74ab681d4cf82336dc, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -34858,8 +34858,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: '>'
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8a89fa14b10d46a99122fd4f73fca9a2, type: 2}
-  m_sharedMaterial: {fileID: 2140474, guid: 8a89fa14b10d46a99122fd4f73fca9a2, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -35163,7 +35163,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &2081978013
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -35210,8 +35210,8 @@ MonoBehaviour:
   headlessStartMode: 0
   editorAutoStart: 0
   sendRate: 60
-  offlineScene: 
-  onlineScene: 
+  offlineScene: Assets/Scenes/Lobby.unity
+  onlineScene: Assets/Scenes/ClassicGameMode.unity
   offlineSceneLoadDelay: 0
   transport: {fileID: 2081978013}
   networkAddress: localhost
@@ -35260,7 +35260,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2081978012}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6442dc8070ceb41f094e44de0bf87274, type: 3}
   m_Name: 
@@ -35389,7 +35389,7 @@ Canvas:
   m_GameObject: {fileID: 2095696448}
   m_Enabled: 1
   serializedVersion: 3
-  m_RenderMode: 0
+  m_RenderMode: 1
   m_Camera: {fileID: 1721989364}
   m_PlaneDistance: 5
   m_PixelPerfect: 0
@@ -40496,8 +40496,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: 
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: dc36b3fdc14f47ebb36fd484a67e268a, type: 2}
-  m_sharedMaterial: {fileID: 2140032, guid: dc36b3fdc14f47ebb36fd484a67e268a, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -40580,7 +40580,6 @@ SceneRoots:
   - {fileID: 1047996320}
   - {fileID: 264961780}
   - {fileID: 1557280571}
-  - {fileID: 2081978015}
   - {fileID: 996436572}
   - {fileID: 1273940005}
   - {fileID: 460471112}
@@ -40590,6 +40589,7 @@ SceneRoots:
   - {fileID: 689533236}
   - {fileID: 582216477}
   - {fileID: 326716006}
+  - {fileID: 2081978015}
   - {fileID: 436814494}
   - {fileID: 1343874818}
   - {fileID: 34487788}

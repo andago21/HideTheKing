@@ -9,7 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4506369956360175221}
-  - component: {fileID: 5243927269762505718}
+  - component: {fileID: 6979363706039661784}
   - component: {fileID: 1074318197010636171}
   m_Layer: 0
   m_Name: ChessNetworkManager
@@ -33,7 +33,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &5243927269762505718
+--- !u!114 &6979363706039661784
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -42,7 +42,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 5341048917419197340}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c53e0008824e981419897f91e9212d12, type: 3}
+  m_Script: {fileID: 11500000, guid: 5999f95b568984f49b20beb9813b5223, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   syncDirection: 0
@@ -50,6 +50,7 @@ MonoBehaviour:
   syncInterval: 0
   boardManager: {fileID: 0}
   isWhitePlayer: 0
+  gameSceneName: ClassicGameMode
 --- !u!114 &1074318197010636171
 MonoBehaviour:
   m_ObjectHideFlags: 0

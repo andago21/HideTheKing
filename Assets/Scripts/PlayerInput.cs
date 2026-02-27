@@ -361,8 +361,6 @@ public class PlayerInput : MonoBehaviour
         Debug.Log("Pawn promoted to " + randomType + "!");
     }
 
-
-    // ── CHANGED: no more selectedPiece hack — just call MovePiece directly ──
     public void ExecuteNetworkMove(Vector2Int from, Vector2Int to)
     {
         Debug.Log("Executing network move: " + from + " -> " + to);

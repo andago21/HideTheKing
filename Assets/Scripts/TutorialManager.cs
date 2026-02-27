@@ -1,0 +1,1855 @@
+﻿using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class TutorialManager : MonoBehaviour
+{
+    public static TutorialManager Instance { get; private set; }
+
+    public Transform[] squares;
+    public BoardManager boardManager;
+
+    public GameObject rookPrefab;
+    public GameObject bishopPrefab;
+    public GameObject queenPrefab;
+    public GameObject kingPrefab;
+    public GameObject knightPrefab;
+    public GameObject pawnPrefab;
+    public GameObject highlightPrefab;
+    public GameObject highlightPrefabLayer2;
+
+    public Transform rookSpawnTransform;
+    public Transform[] rookHighlightTransforms;
+    public Transform bishopSpawnTransform;
+    public Transform[] bishopHighlightTransforms;
+    public Transform queenSpawnTransform;
+    public Transform[] queenHighlightTransforms;
+    public Transform kingSpawnTransform;
+    public Transform[] kingHighlightTransforms;
+    public Transform knightSpawnTransform;
+    public Transform[] knightHighlightTransforms;
+    public Transform pawnSpawnTransform;
+    public Transform[] pawnHighlightTransforms;
+    public Transform[] highlightTransformsLayer2;
+
+    public float highlightYOffset = 0.01f;
+    public bool clearEntireBoardOnCompletion = true;
+
+    public Canvas sourceCanvas;
+    public Canvas rookTargetCanvas;
+    public Canvas bishopTargetCanvas;
+    public Canvas queenTargetCanvas;
+    public Canvas kingTargetCanvas;
+    public Canvas knightTargetCanvas;
+    public Canvas pawnTargetCanvas;
+
+    [Header("Promotion Panel")]
+    public GameObject promotionPanel;
+
+    [Header("Tutorial Piece Offsets")]
+    [SerializeField] Vector3 rookPositionOffset = Vector3.zero;
+    [SerializeField] Vector3 bishopPositionOffset = Vector3.zero;
+    [SerializeField] Vector3 queenPositionOffset = Vector3.zero;
+    [SerializeField] Vector3 kingPositionOffset = Vector3.zero;
+    [SerializeField] Vector3 knightPositionOffset = Vector3.zero;
+    [SerializeField] Vector3 pawnPositionOffset = Vector3.zero;
+
+    GameObject _rookInstance;
+    GameObject _bishopInstance;
+    GameObject _queenInstance;
+    GameObject _kingInstance;
+    GameObject _knightInstance;
+    GameObject _pawnInstance;
+    readonly List<GameObject> _highlights = new List<GameObject>();
+    readonly HashSet<int> _tutorialTargets = new HashSet<int>();
+    readonly HashSet<int> _visitedTargets = new HashSet<int>();
+
+    // Selection state — piece must be clicked first before a destination click moves it
+    bool _pieceSelected;
+
+    GameState _lastGameState = GameState.Playing;
+
+    void Awake()
+    {
+        if (Instance != null && Instance != this) Destroy(gameObject);
+        Instance = this;
+    }
+
+    void OnDestroy() { if (Instance == this) Instance = null; }
+
+    void Start()
+    {
+        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
+        if (boardManager != null) _lastGameState = boardManager.gameState;
+        EnsureSquaresAttached();
+    }
+
+    void EnsureSquaresAttached()
+    {
+        if ((squares == null || squares.Length != 64) && boardManager != null)
+            squares = boardManager.squares;
+        if (squares == null || squares.Length != 64) return;
+
+        for (int i = 0; i < 64; i++)
+        {
+            if (squares[i] == null) continue;
+            var go = squares[i].gameObject;
+            var router = go.GetComponent<TutorialSquareRouter>() ?? go.AddComponent<TutorialSquareRouter>();
+            router.index = i;
+            if (go.GetComponent<Collider>() == null)
+            {
+                var bc = go.AddComponent<BoxCollider>();
+                bc.size = new Vector3(1f, 0.1f, 1f);
+            }
+        }
+    }
+
+    void Update()
+    {
+        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
+        if (boardManager == null) return;
+        var state = boardManager.gameState;
+        if (state == _lastGameState) return;
+        if ((state == GameState.WhiteWins || state == GameState.BlackWins) && LocalPlayerWon(state))
+        {
+            SetCanvas(sourceCanvas, true);
+            SetCanvas(rookTargetCanvas, false);
+            SetCanvas(bishopTargetCanvas, false);
+            SetCanvas(queenTargetCanvas, false);
+            SetCanvas(kingTargetCanvas, false);
+            SetCanvas(knightTargetCanvas, false);
+            SetCanvas(pawnTargetCanvas, false);
+        }
+        _lastGameState = state;
+    }
+
+    // ── Tutorial is only active when a piece instance exists ──────────────────
+    public bool TutorialActive => _rookInstance != null || _bishopInstance != null || _queenInstance != null || _kingInstance != null || _knightInstance != null || _pawnInstance != null;
+
+    // Called by TutorialSquareRouter when a square is clicked
+    public void OnSquareClicked(int index)
+    {
+        if (!TutorialActive) return;
+
+        // If nothing selected yet, check if user clicked the tutorial piece square
+        if (!_pieceSelected)
+        {
+            int pieceIndex = GetTutorialPieceIndex();
+            if (index == pieceIndex)
+                SelectPiece();
+            return;
+        }
+
+        // Piece already selected — try to move to clicked square
+        MoveTutorialPieceToIndex(index);
+    }
+
+    int GetTutorialPieceIndex()
+    {
+        Piece p = GetActivePiece();
+        if (p == null) return -1;
+        return p.position.x * 8 + p.position.y;
+    }
+
+    Piece GetActivePiece()
+    {
+        if (_pawnInstance != null) return _pawnInstance.GetComponent<Piece>();
+        if (_knightInstance != null) return _knightInstance.GetComponent<Piece>();
+        if (_kingInstance != null) return _kingInstance.GetComponent<Piece>();
+        if (_queenInstance != null) return _queenInstance.GetComponent<Piece>();
+        if (_bishopInstance != null) return _bishopInstance.GetComponent<Piece>();
+        if (_rookInstance != null)   return _rookInstance.GetComponent<Piece>();
+        return null;
+    }
+
+    void SelectPiece()
+    {
+        _pieceSelected = true;
+
+        // Visual feedback: highlight the piece or log selection
+        Debug.Log("Tutorial piece selected. Click a highlighted square to move.");
+
+        // Optional: Add a material highlight to the selected piece
+        if (_pawnInstance != null)
+        {
+            HighlightPiece(_pawnInstance);
+        }
+        else if (_knightInstance != null)
+        {
+            HighlightPiece(_knightInstance);
+        }
+        else if (_kingInstance != null)
+        {
+            HighlightPiece(_kingInstance);
+        }
+        else if (_queenInstance != null)
+        {
+            HighlightPiece(_queenInstance);
+        }
+        else if (_rookInstance != null)
+        {
+            HighlightPiece(_rookInstance);
+        }
+        else if (_bishopInstance != null)
+        {
+            HighlightPiece(_bishopInstance);
+        }
+
+        // Show legal moves as highlights
+        ShowLegalMovesForActivePiece();
+    }
+
+    void ShowLegalMovesForActivePiece()
+    {
+        Piece piece = GetActivePiece();
+        if (piece == null) return;
+
+        var legal = piece.GetLegalMovesWithCheckValidation(boardManager != null
+            ? boardManager.boardPieces
+            : new Piece[8, 8]);
+        
+        // Fallback if check validation fails
+        if (legal == null || legal.Count == 0)
+        {
+            var raw = piece.GetLegalMoves(boardManager != null ? boardManager.boardPieces : new Piece[8,8]);
+            if (raw != null && raw.Count > 0)
+            {
+                legal = raw;
+            }
+            else
+            {
+                // Generate moves based on piece type
+                if (_rookInstance != null) legal = GenerateRookMoves(piece.position, piece.isWhite);
+                else if (_bishopInstance != null) legal = GenerateBishopMoves(piece.position, piece.isWhite);
+                else if (_queenInstance != null) legal = GenerateQueenMoves(piece.position, piece.isWhite);
+                else if (_kingInstance != null) legal = GenerateKingMoves(piece.position, piece.isWhite);
+                else if (_knightInstance != null) legal = GenerateKnightMoves(piece.position, piece.isWhite);
+                else if (_pawnInstance != null) legal = GeneratePawnMoves(piece.position, piece.isWhite, piece.hasMoved);
+                
+                if (legal == null) legal = new List<Vector2Int>();
+            }
+        }
+
+        // Show highlights for legal moves
+        foreach (var move in legal)
+        {
+            int moveIndex = move.x * 8 + move.y;
+            // Only create new highlight if it doesn't already exist
+            bool alreadyHighlighted = false;
+            foreach (var h in _highlights)
+            {
+                if (h != null)
+                {
+                    var th = h.GetComponent<TutorialHighlight>();
+                    if (th != null && th.index == moveIndex)
+                    {
+                        alreadyHighlighted = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (!alreadyHighlighted)
+            {
+                ShowLegalMoveHighlightAtIndex(moveIndex);
+            }
+        }
+    }
+
+    void HighlightPiece(GameObject piece)
+    {
+        if (piece == null) return;
+        var renderers = piece.GetComponentsInChildren<Renderer>();
+        foreach (var rend in renderers)
+        {
+            // Store original materials and apply a highlight effect (optional)
+            foreach (var material in rend.materials)
+            {
+                material.color = material.color * 1.2f; // Brighten the piece
+            }
+        }
+    }
+
+    public void DeselectPiece()
+    {
+        _pieceSelected = false;
+
+        // Reset visual feedback
+        if (_pawnInstance != null)
+        {
+            RestorePieceAppearance(_pawnInstance);
+        }
+        else if (_knightInstance != null)
+        {
+            RestorePieceAppearance(_knightInstance);
+        }
+        else if (_kingInstance != null)
+        {
+            RestorePieceAppearance(_kingInstance);
+        }
+        else if (_queenInstance != null)
+        {
+            RestorePieceAppearance(_queenInstance);
+        }
+        else if (_rookInstance != null)
+        {
+            RestorePieceAppearance(_rookInstance);
+        }
+        else if (_bishopInstance != null)
+        {
+            RestorePieceAppearance(_bishopInstance);
+        }
+    }
+
+    void RestorePieceAppearance(GameObject piece)
+    {
+        if (piece == null) return;
+        var renderers = piece.GetComponentsInChildren<Renderer>();
+        foreach (var rend in renderers)
+        {
+            foreach (var material in rend.materials)
+            {
+                material.color = material.color / 1.2f; // Restore original brightness
+            }
+        }
+    }
+
+    public void ShowPromotionPanel()
+    {
+        if (promotionPanel != null)
+        {
+            promotionPanel.SetActive(true);
+            StartCoroutine(HidePromotionPanelAfterDelay(7f));
+        }
+    }
+
+    public void HidePromotionPanel()
+    {
+        if (promotionPanel != null)
+        {
+            promotionPanel.SetActive(false);
+        }
+    }
+
+    private IEnumerator HidePromotionPanelAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        HidePromotionPanel();
+    }
+
+    // ── Button handlers ───────────────────────────────────────────────────────
+    public void OnRookButton()
+    {
+        EnsureSquaresAttached();
+        SetCanvas(sourceCanvas, false);
+        SetCanvas(rookTargetCanvas, true);
+
+        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
+        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
+
+        if (rookSpawnTransform != null)
+        {
+            int spawnIndex = GetIndexFromTransform(rookSpawnTransform);
+            InstantiateRookAtIndex(spawnIndex);
+        }
+        else
+        {
+            InstantiateRookAtAlgebraic("d4");
+        }
+
+        ClearHighlights();
+        _pieceSelected = false;
+
+        if (rookHighlightTransforms != null && rookHighlightTransforms.Length > 0)
+        {
+            CreateHighlightsFromTransforms(rookHighlightTransforms);
+            // Show same highlights on Layer2 on top
+            CreateHighlightsLayer2FromTransforms(rookHighlightTransforms);
+        }
+    }
+
+    public void OnBishopButton()
+    {
+        EnsureSquaresAttached();
+        SetCanvas(sourceCanvas, false);
+        SetCanvas(rookTargetCanvas, false);
+        SetCanvas(bishopTargetCanvas, true);
+
+        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
+        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
+
+        if (bishopSpawnTransform != null)
+        {
+            int spawnIndex = GetIndexFromTransform(bishopSpawnTransform);
+            InstantiateBishopAtIndex(spawnIndex);
+        }
+        else
+        {
+            InstantiateBishopAtAlgebraic("d4");
+        }
+
+        ClearHighlights();
+        _pieceSelected = false;
+
+        if (bishopHighlightTransforms != null && bishopHighlightTransforms.Length > 0)
+        {
+            CreateHighlightsFromTransforms(bishopHighlightTransforms);
+            // Show same highlights on Layer2 on top
+            CreateHighlightsLayer2FromTransforms(bishopHighlightTransforms);
+        }
+    }
+
+    public void OnQueenButton()
+    {
+        EnsureSquaresAttached();
+        SetCanvas(sourceCanvas, false);
+        SetCanvas(rookTargetCanvas, false);
+        SetCanvas(bishopTargetCanvas, false);
+        SetCanvas(queenTargetCanvas, true);
+
+        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
+        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
+
+        if (queenSpawnTransform != null)
+        {
+            int spawnIndex = GetIndexFromTransform(queenSpawnTransform);
+            InstantiateQueenAtIndex(spawnIndex);
+        }
+        else
+        {
+            InstantiateQueenAtAlgebraic("d4");
+        }
+
+        ClearHighlights();
+        _pieceSelected = false;
+
+        if (queenHighlightTransforms != null && queenHighlightTransforms.Length > 0)
+        {
+            CreateHighlightsFromTransforms(queenHighlightTransforms);
+            // Show same highlights on Layer2 on top
+            CreateHighlightsLayer2FromTransforms(queenHighlightTransforms);
+        }
+    }
+
+    public void OnKingButton()
+    {
+        EnsureSquaresAttached();
+        SetCanvas(sourceCanvas, false);
+        SetCanvas(rookTargetCanvas, false);
+        SetCanvas(bishopTargetCanvas, false);
+        SetCanvas(queenTargetCanvas, false);
+        SetCanvas(kingTargetCanvas, true);
+
+        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
+        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
+
+        if (kingSpawnTransform != null)
+        {
+            int spawnIndex = GetIndexFromTransform(kingSpawnTransform);
+            InstantiateKingAtIndex(spawnIndex);
+        }
+        else
+        {
+            InstantiateKingAtAlgebraic("d4");
+        }
+
+        ClearHighlights();
+        _pieceSelected = false;
+
+        if (kingHighlightTransforms != null && kingHighlightTransforms.Length > 0)
+        {
+            CreateHighlightsFromTransforms(kingHighlightTransforms);
+            // Show same highlights on Layer2 on top
+            CreateHighlightsLayer2FromTransforms(kingHighlightTransforms);
+        }
+    }
+
+    public void OnKnightButton()
+    {
+        EnsureSquaresAttached();
+        SetCanvas(sourceCanvas, false);
+        SetCanvas(rookTargetCanvas, false);
+        SetCanvas(bishopTargetCanvas, false);
+        SetCanvas(queenTargetCanvas, false);
+        SetCanvas(kingTargetCanvas, false);
+        SetCanvas(knightTargetCanvas, true);
+
+        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
+        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
+
+        if (knightSpawnTransform != null)
+        {
+            int spawnIndex = GetIndexFromTransform(knightSpawnTransform);
+            InstantiateKnightAtIndex(spawnIndex);
+        }
+        else
+        {
+            InstantiateKnightAtAlgebraic("d4");
+        }
+
+        ClearHighlights();
+        _pieceSelected = false;
+
+        if (knightHighlightTransforms != null && knightHighlightTransforms.Length > 0)
+        {
+            CreateHighlightsFromTransforms(knightHighlightTransforms);
+            // Show same highlights on Layer2 on top
+            CreateHighlightsLayer2FromTransforms(knightHighlightTransforms);
+        }
+    }
+
+    public void OnPawnButton()
+    {
+        EnsureSquaresAttached();
+        SetCanvas(sourceCanvas, false);
+        SetCanvas(rookTargetCanvas, false);
+        SetCanvas(bishopTargetCanvas, false);
+        SetCanvas(queenTargetCanvas, false);
+        SetCanvas(kingTargetCanvas, false);
+        SetCanvas(knightTargetCanvas, false);
+        SetCanvas(pawnTargetCanvas, true);
+
+        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
+        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
+
+        if (pawnSpawnTransform != null)
+        {
+            int spawnIndex = GetIndexFromTransform(pawnSpawnTransform);
+            InstantiatePawnAtIndex(spawnIndex);
+        }
+        else
+        {
+            InstantiatePawnAtAlgebraic("d2");
+        }
+
+        ClearHighlights();
+        _pieceSelected = false;
+
+        if (pawnHighlightTransforms != null && pawnHighlightTransforms.Length > 0)
+        {
+            CreateHighlightsFromTransforms(pawnHighlightTransforms);
+            // Show same highlights on Layer2 on top
+            CreateHighlightsLayer2FromTransforms(pawnHighlightTransforms);
+        }
+    }
+
+    public void OnBackButton()
+    {
+        // Clear the current tutorial
+        ClearHighlights();
+        ClearRook();
+        ClearBishop();
+        ClearQueen();
+        ClearKing();
+        ClearKnight();
+        ClearPawn();
+        _tutorialTargets.Clear();
+        _visitedTargets.Clear();
+        _pieceSelected = false;
+
+        // Deactivate all piece tutorial canvases and activate source canvas
+        SetCanvas(rookTargetCanvas, false);
+        SetCanvas(bishopTargetCanvas, false);
+        SetCanvas(queenTargetCanvas, false);
+        SetCanvas(kingTargetCanvas, false);
+        SetCanvas(knightTargetCanvas, false);
+        SetCanvas(pawnTargetCanvas, false);
+        SetCanvas(sourceCanvas, true);
+    }
+
+    public void ShowHighlightAtIndex(int index)
+    {
+        if (!IsValidIndex(index) || highlightPrefab == null) return;
+        var pos = squares[index].position + new Vector3(-0.5f, highlightYOffset, +0.5f);
+        var h = Instantiate(highlightPrefab, pos, highlightPrefab.transform.rotation, squares[index]);
+        h.name = "Tutorial_Highlight_" + IndexToAlgebraic(index);
+
+        var th = h.GetComponent<TutorialHighlight>() ?? h.AddComponent<TutorialHighlight>();
+        th.index = index;
+        th.manager = this;
+        _tutorialTargets.Add(index);
+
+        var col = h.GetComponent<Collider>();
+        if (col == null)
+        {
+            var bc = h.AddComponent<BoxCollider>();
+            bc.isTrigger = false;
+            bc.center = Vector3.zero;
+            bc.size = new Vector3(1f, 0.1f, 1f);
+        }
+        else col.isTrigger = false;
+
+        SetLayerRecursively(h.gameObject, squares[index].gameObject.layer);
+        _highlights.Add(h);
+    }
+
+    public void ShowLegalMoveHighlightAtIndex(int index)
+    {
+        if (!IsValidIndex(index) || highlightPrefab == null) return;
+        var pos = squares[index].position + new Vector3(-0.5f, highlightYOffset, +0.5f);
+        var h = Instantiate(highlightPrefab, pos, highlightPrefab.transform.rotation, squares[index]);
+        h.name = "Tutorial_LegalMove_Highlight_" + IndexToAlgebraic(index);
+
+        var th = h.GetComponent<TutorialHighlight>() ?? h.AddComponent<TutorialHighlight>();
+        th.index = index;
+        th.manager = this;
+        // NOTE: Do NOT add to _tutorialTargets - this is for legal moves, not tutorial targets
+
+        var col = h.GetComponent<Collider>();
+        if (col == null)
+        {
+            var bc = h.AddComponent<BoxCollider>();
+            bc.isTrigger = false;
+            bc.center = Vector3.zero;
+            bc.size = new Vector3(1f, 0.1f, 1f);
+        }
+        else col.isTrigger = false;
+
+        SetLayerRecursively(h.gameObject, squares[index].gameObject.layer);
+        _highlights.Add(h);
+    }
+
+    public void ShowHighlightAtIndexLayer2(int index)
+    {
+        if (!IsValidIndex(index) || highlightPrefabLayer2 == null) return;
+        var pos = squares[index].position + new Vector3(-0.5f, highlightYOffset, +0.5f);
+        var h = Instantiate(highlightPrefabLayer2, pos, highlightPrefabLayer2.transform.rotation, squares[index]);
+        h.name = "Tutorial_Highlight_Layer2_" + IndexToAlgebraic(index);
+
+        var th = h.GetComponent<TutorialHighlight>() ?? h.AddComponent<TutorialHighlight>();
+        th.index = index;
+        th.manager = this;
+
+        var col = h.GetComponent<Collider>();
+        if (col == null)
+        {
+            var bc = h.AddComponent<BoxCollider>();
+            bc.isTrigger = false;
+            bc.center = Vector3.zero;
+            bc.size = new Vector3(1f, 0.1f, 1f);
+        }
+        else col.isTrigger = false;
+
+        SetLayerRecursively(h.gameObject, squares[index].gameObject.layer);
+        _highlights.Add(h);
+    }
+
+    public void MoveTutorialRookToIndex(int index)
+    {
+        Debug.Log($"MoveTutorialRookToIndex called with index={index}");
+        if (_rookInstance == null || !IsValidIndex(index))
+        {
+            Debug.Log("Invalid move attempt.");
+            return;
+        }
+
+        var piece = _rookInstance.GetComponent<Piece>();
+        if (piece == null) return;
+
+        var legal = piece.GetLegalMovesWithCheckValidation(boardManager != null
+            ? boardManager.boardPieces
+            : new Piece[8, 8]);
+        // Fallbacks: try raw Piece moves, then simple generator if prefab doesn't provide move logic
+        if (legal == null || legal.Count == 0)
+        {
+            var raw = piece.GetLegalMoves(boardManager != null ? boardManager.boardPieces : new Piece[8,8]);
+            if (raw != null && raw.Count > 0) legal = raw;
+            else
+            {
+                legal = GenerateRookMoves(piece.position, piece.isWhite);
+                Debug.LogWarning("Using generated rook moves as fallback for tutorial piece.");
+            }
+        }
+        var target = new Vector2Int(index / 8, index % 8);
+        if (!legal.Contains(target))
+        {
+            // Diagnostic logging: show why move considered illegal
+            string legalStr = "";
+            foreach (var m in legal) legalStr += IndexToAlgebraic(m.x * 8 + m.y) + ",";
+            Debug.LogWarning($"Move not allowed to {IndexToAlgebraic(index)}. Piece at {IndexToAlgebraic(piece.position.x*8 + piece.position.y)}. Legal moves: {legalStr}");
+
+            if (boardManager?.boardPieces != null)
+            {
+                Debug.Log($"Board at target {IndexToAlgebraic(index)} contains: {boardManager.boardPieces[target.x, target.y]?.type.ToString() ?? "null"}");
+            }
+            return;
+        }
+
+        if (boardManager?.boardPieces != null)
+        {
+            var old = piece.position;
+            boardManager.boardPieces[old.x, old.y] = null;
+            var dest = boardManager.boardPieces[target.x, target.y];
+            if (dest != null && dest != piece) boardManager.SendToSide(dest);
+            boardManager.boardPieces[target.x, target.y] = piece;
+        }
+
+        var p = squares[index].position + rookPositionOffset;
+        p.y = 0f;
+        _rookInstance.transform.position = p;
+        piece.position = target;
+        piece.hasMoved = true;
+
+        if (_tutorialTargets.Contains(index))
+        {
+            _visitedTargets.Add(index);
+            if (_visitedTargets.Count == _tutorialTargets.Count) ClearTutorial();
+        }
+
+        Debug.Log($"Tutorial rook moved to {IndexToAlgebraic(index)}");
+    }
+
+    // Move tutorial bishop (same validation as rook)
+    public void MoveTutorialBishopToIndex(int index)
+    {
+        Debug.Log($"MoveTutorialBishopToIndex called with index={index}");
+        if (_bishopInstance == null || !IsValidIndex(index))
+        {
+            Debug.Log("Invalid move attempt.");
+            return;
+        }
+
+        var piece = _bishopInstance.GetComponent<Piece>();
+        if (piece == null) return;
+
+        var legal = piece.GetLegalMovesWithCheckValidation(boardManager != null
+            ? boardManager.boardPieces
+            : new Piece[8, 8]);
+        if ((legal == null || legal.Count == 0))
+        {
+            var raw = piece.GetLegalMoves(boardManager != null ? boardManager.boardPieces : new Piece[8,8]);
+            if (raw != null && raw.Count > 0)
+            {
+                legal = raw;
+                Debug.LogWarning("Using raw GetLegalMoves fallback for tutorial piece (check-validation returned empty).");
+            }
+            else
+            {
+                legal = GenerateBishopMoves(piece.position, piece.isWhite);
+                Debug.LogWarning("Using generated bishop moves as fallback for tutorial piece.");
+            }
+        }
+        var target = new Vector2Int(index / 8, index % 8);
+        if (!legal.Contains(target))
+        {
+            // Diagnostic logging: show why move considered illegal
+            string legalStr = "";
+            foreach (var m in legal) legalStr += IndexToAlgebraic(m.x * 8 + m.y) + ",";
+            Debug.LogWarning($"Move not allowed to {IndexToAlgebraic(index)}. Piece at {IndexToAlgebraic(piece.position.x*8 + piece.position.y)}. Legal moves: {legalStr}");
+
+            if (boardManager?.boardPieces != null)
+            {
+                Debug.Log($"Board at target {IndexToAlgebraic(index)} contains: {boardManager.boardPieces[target.x, target.y]?.type.ToString() ?? "null"}");
+            }
+            return;
+        }
+
+        if (boardManager?.boardPieces != null)
+        {
+            var old = piece.position;
+            boardManager.boardPieces[old.x, old.y] = null;
+            var dest = boardManager.boardPieces[target.x, target.y];
+            if (dest != null && dest != piece) boardManager.SendToSide(dest);
+            boardManager.boardPieces[target.x, target.y] = piece;
+        }
+
+        var p = squares[index].position + bishopPositionOffset;
+        p.y = 0f;
+        _bishopInstance.transform.position = p;
+        piece.position = target;
+        piece.hasMoved = true;
+
+        if (_tutorialTargets.Contains(index))
+        {
+            _visitedTargets.Add(index);
+            if (_visitedTargets.Count == _tutorialTargets.Count) ClearTutorial();
+        }
+
+        DeselectPiece(); // Reset selection after move
+        Debug.Log($"Tutorial bishop moved to {IndexToAlgebraic(index)}");
+    }
+
+    public void MoveTutorialQueenToIndex(int index)
+    {
+        Debug.Log($"MoveTutorialQueenToIndex called with index={index}");
+        if (_queenInstance == null || !IsValidIndex(index))
+        {
+            Debug.Log("Invalid move attempt.");
+            return;
+        }
+
+        var piece = _queenInstance.GetComponent<Piece>();
+        if (piece == null) return;
+
+        var legal = piece.GetLegalMovesWithCheckValidation(boardManager != null
+            ? boardManager.boardPieces
+            : new Piece[8, 8]);
+        if (legal == null || legal.Count == 0)
+        {
+            var raw = piece.GetLegalMoves(boardManager != null ? boardManager.boardPieces : new Piece[8,8]);
+            if (raw != null && raw.Count > 0)
+            {
+                legal = raw;
+                Debug.LogWarning("Using raw GetLegalMoves fallback for tutorial piece (check-validation returned empty).");
+            }
+            else
+            {
+                legal = GenerateQueenMoves(piece.position, piece.isWhite);
+                Debug.LogWarning("Using generated queen moves as fallback for tutorial piece.");
+            }
+        }
+        var target = new Vector2Int(index / 8, index % 8);
+        if (!legal.Contains(target))
+        {
+            string legalStr = "";
+            foreach (var m in legal) legalStr += IndexToAlgebraic(m.x * 8 + m.y) + ",";
+            Debug.LogWarning($"Move not allowed to {IndexToAlgebraic(index)}. Piece at {IndexToAlgebraic(piece.position.x*8 + piece.position.y)}. Legal moves: {legalStr}");
+
+            if (boardManager?.boardPieces != null)
+            {
+                Debug.Log($"Board at target {IndexToAlgebraic(index)} contains: {boardManager.boardPieces[target.x, target.y]?.type.ToString() ?? "null"}");
+            }
+            return;
+        }
+
+        if (boardManager?.boardPieces != null)
+        {
+            var old = piece.position;
+            boardManager.boardPieces[old.x, old.y] = null;
+            var dest = boardManager.boardPieces[target.x, target.y];
+            if (dest != null && dest != piece) boardManager.SendToSide(dest);
+            boardManager.boardPieces[target.x, target.y] = piece;
+        }
+
+        var p = squares[index].position + queenPositionOffset;
+        p.y = 0f;
+        _queenInstance.transform.position = p;
+        piece.position = target;
+        piece.hasMoved = true;
+
+        if (_tutorialTargets.Contains(index))
+        {
+            _visitedTargets.Add(index);
+            if (_visitedTargets.Count == _tutorialTargets.Count) ClearTutorial();
+        }
+
+        DeselectPiece();
+        Debug.Log($"Tutorial queen moved to {IndexToAlgebraic(index)}");
+    }
+
+    public void MoveTutorialKingToIndex(int index)
+    {
+        Debug.Log($"MoveTutorialKingToIndex called with index={index}");
+        if (_kingInstance == null || !IsValidIndex(index))
+        {
+            Debug.Log("Invalid move attempt.");
+            return;
+        }
+
+        var piece = _kingInstance.GetComponent<Piece>();
+        if (piece == null) return;
+
+        var legal = piece.GetLegalMovesWithCheckValidation(boardManager != null
+            ? boardManager.boardPieces
+            : new Piece[8, 8]);
+        if (legal == null || legal.Count == 0)
+        {
+            var raw = piece.GetLegalMoves(boardManager != null ? boardManager.boardPieces : new Piece[8,8]);
+            if (raw != null && raw.Count > 0)
+            {
+                legal = raw;
+                Debug.LogWarning("Using raw GetLegalMoves fallback for tutorial piece (check-validation returned empty).");
+            }
+            else
+            {
+                legal = GenerateKingMoves(piece.position, piece.isWhite);
+                Debug.LogWarning("Using generated king moves as fallback for tutorial piece.");
+            }
+        }
+        var target = new Vector2Int(index / 8, index % 8);
+        if (!legal.Contains(target))
+        {
+            string legalStr = "";
+            foreach (var m in legal) legalStr += IndexToAlgebraic(m.x * 8 + m.y) + ",";
+            Debug.LogWarning($"Move not allowed to {IndexToAlgebraic(index)}. Piece at {IndexToAlgebraic(piece.position.x*8 + piece.position.y)}. Legal moves: {legalStr}");
+
+            if (boardManager?.boardPieces != null)
+            {
+                Debug.Log($"Board at target {IndexToAlgebraic(index)} contains: {boardManager.boardPieces[target.x, target.y]?.type.ToString() ?? "null"}");
+            }
+            return;
+        }
+
+        if (boardManager?.boardPieces != null)
+        {
+            var old = piece.position;
+            boardManager.boardPieces[old.x, old.y] = null;
+            var dest = boardManager.boardPieces[target.x, target.y];
+            if (dest != null && dest != piece) boardManager.SendToSide(dest);
+            boardManager.boardPieces[target.x, target.y] = piece;
+        }
+
+        var p = squares[index].position + kingPositionOffset;
+        p.y = 0f;
+        _kingInstance.transform.position = p;
+        piece.position = target;
+        piece.hasMoved = true;
+
+        if (_tutorialTargets.Contains(index))
+        {
+            _visitedTargets.Add(index);
+            if (_visitedTargets.Count == _tutorialTargets.Count) ClearTutorial();
+        }
+
+        DeselectPiece();
+        Debug.Log($"Tutorial king moved to {IndexToAlgebraic(index)}");
+    }
+
+    public void MoveTutorialKnightToIndex(int index)
+    {
+        Debug.Log($"MoveTutorialKnightToIndex called with index={index}");
+        if (_knightInstance == null || !IsValidIndex(index))
+        {
+            Debug.Log("Invalid move attempt.");
+            return;
+        }
+
+        var piece = _knightInstance.GetComponent<Piece>();
+        if (piece == null) return;
+
+        var legal = piece.GetLegalMovesWithCheckValidation(boardManager != null
+            ? boardManager.boardPieces
+            : new Piece[8, 8]);
+        if (legal == null || legal.Count == 0)
+        {
+            var raw = piece.GetLegalMoves(boardManager != null ? boardManager.boardPieces : new Piece[8,8]);
+            if (raw != null && raw.Count > 0)
+            {
+                legal = raw;
+                Debug.LogWarning("Using raw GetLegalMoves fallback for tutorial piece (check-validation returned empty).");
+            }
+            else
+            {
+                legal = GenerateKnightMoves(piece.position, piece.isWhite);
+                Debug.LogWarning("Using generated knight moves as fallback for tutorial piece.");
+            }
+        }
+        var target = new Vector2Int(index / 8, index % 8);
+        if (!legal.Contains(target))
+        {
+            string legalStr = "";
+            foreach (var m in legal) legalStr += IndexToAlgebraic(m.x * 8 + m.y) + ",";
+            Debug.LogWarning($"Move not allowed to {IndexToAlgebraic(index)}. Piece at {IndexToAlgebraic(piece.position.x*8 + piece.position.y)}. Legal moves: {legalStr}");
+
+            if (boardManager?.boardPieces != null)
+            {
+                Debug.Log($"Board at target {IndexToAlgebraic(index)} contains: {boardManager.boardPieces[target.x, target.y]?.type.ToString() ?? "null"}");
+            }
+            return;
+        }
+
+        if (boardManager?.boardPieces != null)
+        {
+            var old = piece.position;
+            boardManager.boardPieces[old.x, old.y] = null;
+            var dest = boardManager.boardPieces[target.x, target.y];
+            if (dest != null && dest != piece) boardManager.SendToSide(dest);
+            boardManager.boardPieces[target.x, target.y] = piece;
+        }
+
+        var p = squares[index].position + knightPositionOffset;
+        p.y = 0f;
+        _knightInstance.transform.position = p;
+        piece.position = target;
+        piece.hasMoved = true;
+
+        if (_tutorialTargets.Contains(index))
+        {
+            _visitedTargets.Add(index);
+            if (_visitedTargets.Count == _tutorialTargets.Count) ClearTutorial();
+        }
+
+        DeselectPiece();
+        Debug.Log($"Tutorial knight moved to {IndexToAlgebraic(index)}");
+    }
+
+    public void MoveTutorialPawnToIndex(int index)
+    {
+        Debug.Log($"MoveTutorialPawnToIndex called with index={index}");
+        if (_pawnInstance == null || !IsValidIndex(index))
+        {
+            Debug.Log("Invalid move attempt.");
+            return;
+        }
+
+        var piece = _pawnInstance.GetComponent<Piece>();
+        if (piece == null) return;
+
+        var legal = piece.GetLegalMovesWithCheckValidation(boardManager != null
+            ? boardManager.boardPieces
+            : new Piece[8, 8]);
+        if (legal == null || legal.Count == 0)
+        {
+            var raw = piece.GetLegalMoves(boardManager != null ? boardManager.boardPieces : new Piece[8,8]);
+            if (raw != null && raw.Count > 0)
+            {
+                legal = raw;
+                Debug.LogWarning("Using raw GetLegalMoves fallback for tutorial piece (check-validation returned empty).");
+            }
+            else
+            {
+                legal = GeneratePawnMoves(piece.position, piece.isWhite, piece.hasMoved);
+                Debug.LogWarning("Using generated pawn moves as fallback for tutorial piece.");
+            }
+        }
+        var target = new Vector2Int(index / 8, index % 8);
+        if (!legal.Contains(target))
+        {
+            string legalStr = "";
+            foreach (var m in legal) legalStr += IndexToAlgebraic(m.x * 8 + m.y) + ",";
+            Debug.LogWarning($"Move not allowed to {IndexToAlgebraic(index)}. Piece at {IndexToAlgebraic(piece.position.x*8 + piece.position.y)}. Legal moves: {legalStr}");
+
+            if (boardManager?.boardPieces != null)
+            {
+                Debug.Log($"Board at target {IndexToAlgebraic(index)} contains: {boardManager.boardPieces[target.x, target.y]?.type.ToString() ?? "null"}");
+            }
+            return;
+        }
+
+        if (boardManager?.boardPieces != null)
+        {
+            var old = piece.position;
+            boardManager.boardPieces[old.x, old.y] = null;
+            var dest = boardManager.boardPieces[target.x, target.y];
+            if (dest != null && dest != piece) boardManager.SendToSide(dest);
+            boardManager.boardPieces[target.x, target.y] = piece;
+        }
+
+        var p = squares[index].position + pawnPositionOffset;
+        p.y = 0f;
+        _pawnInstance.transform.position = p;
+        
+        // Store the old position index before updating piece.position
+        var oldPosition = piece.position;
+        int oldPositionIndex = oldPosition.x * 8 + oldPosition.y;
+        
+        piece.position = target;
+        piece.hasMoved = true;
+
+        // Check for pawn promotion (pawn reaches a8 - rank 8 for white)
+        // a8 = file 0, rank 7 = position (7, 0)
+        if (piece.type == PieceType.Pawn && target.x == 7 && target.y == 0)
+        {
+            // Pawn reached a8 - promote to queen
+            Debug.Log("Pawn promoted to Queen at a8!");
+            
+            if (queenPrefab != null)
+            {
+                // Store the position where the pawn is
+                var pawnPos = _pawnInstance.transform.position;
+                var pawnRot = _pawnInstance.transform.rotation;
+                
+                // Destroy the pawn GameObject
+                Destroy(_pawnInstance);
+                
+                // Instantiate the queen prefab at the same position
+                _queenInstance = Instantiate(queenPrefab, pawnPos, pawnRot);
+                _pawnInstance = null;
+                
+                // Set up the queen piece component
+                var queenPiece = _queenInstance.GetComponent<Piece>();
+                if (queenPiece == null)
+                {
+                    queenPiece = _queenInstance.AddComponent<Piece>();
+                }
+                
+                // Ensure QueenPiece script is present
+                var queenPieceScript = _queenInstance.GetComponent<QueenPiece>();
+                if (queenPieceScript == null)
+                {
+                    queenPieceScript = _queenInstance.AddComponent<QueenPiece>();
+                }
+                
+                if (queenPiece != null)
+                {
+                    queenPiece.position = target;
+                    queenPiece.isWhite = true;
+                    queenPiece.hasMoved = true;
+                    queenPiece.type = PieceType.Queen;
+                }
+                
+                // Add collider
+                if (_queenInstance.GetComponent<Collider>() == null)
+                {
+                    var bc = _queenInstance.AddComponent<SphereCollider>();
+                    bc.radius = 0.3f;
+                    bc.isTrigger = false;
+                }
+                
+                // Add click handler
+                if (_queenInstance.GetComponent<TutorialPieceClickHandler>() == null)
+                {
+                    var handler = _queenInstance.AddComponent<TutorialPieceClickHandler>();
+                    handler.manager = this;
+                    handler.pieceIndex = index;
+                }
+                
+                // Update board
+                if (boardManager?.boardPieces != null)
+                {
+                    boardManager.boardPieces[target.x, target.y] = queenPiece;
+                }
+                
+                // Show promotion panel
+                ShowPromotionPanel();
+            }
+        }
+
+        if (_tutorialTargets.Contains(index))
+        {
+            _visitedTargets.Add(index);
+            if (_visitedTargets.Count == _tutorialTargets.Count) ClearTutorial();
+        }
+
+        // Remove all legal move highlights (keep only tutorial target highlights)
+        var highlightsToRemove = new List<GameObject>();
+        foreach (var h in _highlights)
+        {
+            if (h != null)
+            {
+                var th = h.GetComponent<TutorialHighlight>();
+                if (th != null && !_tutorialTargets.Contains(th.index))
+                {
+                    // This is a legal move highlight, not a tutorial target - remove it
+                    highlightsToRemove.Add(h);
+                }
+            }
+        }
+        
+        foreach (var h in highlightsToRemove)
+        {
+            _highlights.Remove(h);
+            Destroy(h);
+        }
+
+        DeselectPiece();
+        Debug.Log($"Tutorial pawn moved to {IndexToAlgebraic(index)}");
+    }
+
+    // Generic entrypoint: move whichever tutorial piece is active (rook preferred)
+    public void MoveTutorialPieceToIndex(int index)
+    {
+        // Clear legal move highlights before moving the piece
+        ClearLegalMoveHighlights();
+        
+        // Deselect the piece
+        DeselectPiece();
+        
+        if (_pawnInstance != null) MoveTutorialPawnToIndex(index);
+        else if (_knightInstance != null) MoveTutorialKnightToIndex(index);
+        else if (_kingInstance != null) MoveTutorialKingToIndex(index);
+        else if (_queenInstance != null) MoveTutorialQueenToIndex(index);
+        else if (_rookInstance != null) MoveTutorialRookToIndex(index);
+        else if (_bishopInstance != null) MoveTutorialBishopToIndex(index);
+        else Debug.Log("No tutorial piece present to move.");
+    }
+
+    void ClearTutorial()
+    {
+        if (clearEntireBoardOnCompletion && boardManager != null) ClearEntireBoard();
+        ClearHighlights();
+        ClearRook();
+        ClearBishop();
+        ClearQueen();
+        ClearKing();
+        ClearKnight();
+        ClearPawn();
+        _tutorialTargets.Clear();
+        _visitedTargets.Clear();
+    }
+
+    void ClearEntireBoard()
+    {
+        if (boardManager?.boardPieces == null) return;
+
+        var rookPiece = _rookInstance != null ? _rookInstance.GetComponent<Piece>() : null;
+        var bishopPiece = _bishopInstance != null ? _bishopInstance.GetComponent<Piece>() : null;
+        var queenPiece = _queenInstance != null ? _queenInstance.GetComponent<Piece>() : null;
+        var kingPiece = _kingInstance != null ? _kingInstance.GetComponent<Piece>() : null;
+        var knightPiece = _knightInstance != null ? _knightInstance.GetComponent<Piece>() : null;
+        var pawnPiece = _pawnInstance != null ? _pawnInstance.GetComponent<Piece>() : null;
+
+        for (int r = 0; r < 8; r++)
+        for (int c = 0; c < 8; c++)
+        {
+            var p = boardManager.boardPieces[r, c];
+            if (p == null) continue;
+
+            if (p == rookPiece || p == bishopPiece || p == queenPiece || p == kingPiece || p == knightPiece || p == pawnPiece)
+            {
+                boardManager.boardPieces[r, c] = null;
+                if (p == rookPiece) Destroy(_rookInstance);
+                if (p == bishopPiece) Destroy(_bishopInstance);
+                if (p == queenPiece) Destroy(_queenInstance);
+                if (p == kingPiece) Destroy(_kingInstance);
+                if (p == knightPiece) Destroy(_knightInstance);
+                if (p == pawnPiece) Destroy(_pawnInstance);
+                continue;
+            }
+
+            boardManager.SendToSide(p);
+            boardManager.boardPieces[r, c] = null;
+        }
+
+        _rookInstance = null;
+        _bishopInstance = null;
+        _queenInstance = null;
+        _kingInstance = null;
+        _knightInstance = null;
+        _pawnInstance = null;
+
+        SetCanvas(sourceCanvas, true);
+        SetCanvas(rookTargetCanvas, false);
+        SetCanvas(bishopTargetCanvas, false);
+        SetCanvas(queenTargetCanvas, false);
+        SetCanvas(kingTargetCanvas, false);
+        SetCanvas(knightTargetCanvas, false);
+        SetCanvas(pawnTargetCanvas, false);
+    }
+
+    void InstantiateRookAtAlgebraic(string alg)
+    {
+        int idx = AlgebraicToIndex(alg);
+        if (IsValidIndex(idx)) InstantiateRookAtIndex(idx);
+    }
+
+    void InstantiateRookAtIndex(int index)
+    {
+        if (!IsValidIndex(index) || rookPrefab == null) return;
+        ClearRook();
+        var pos = squares[index].position + rookPositionOffset;
+        pos.y = 0f;
+        _rookInstance = Instantiate(rookPrefab, pos, rookPrefab.transform.rotation);
+        var piece = _rookInstance.GetComponent<Piece>();
+        if (piece == null)
+        {
+            piece = _rookInstance.AddComponent<Piece>();
+        }
+        // Ensure RookPiece script is present for proper move generation
+        var rookPiece = _rookInstance.GetComponent<RookPiece>();
+        if (rookPiece == null)
+        {
+            rookPiece = _rookInstance.AddComponent<RookPiece>();
+        }
+        if (piece != null)
+        {
+            piece.position = new Vector2Int(index / 8, index % 8);
+            piece.isWhite = true;
+            piece.hasMoved = false;
+        }
+        if (boardManager?.boardPieces != null)
+        {
+            boardManager.boardPieces[index / 8, index % 8] = piece;
+        }
+
+        if (_rookInstance.GetComponent<Collider>() == null)
+        {
+            var bc = _rookInstance.AddComponent<SphereCollider>();
+            bc.radius = 0.3f;
+            bc.isTrigger = false;
+        }
+
+        if (_rookInstance.GetComponent<TutorialPieceClickHandler>() == null)
+        {
+            var handler = _rookInstance.AddComponent<TutorialPieceClickHandler>();
+            handler.manager = this;
+            handler.pieceIndex = index;
+        }
+    }
+
+    void InstantiateBishopAtAlgebraic(string alg)
+    {
+        int idx = AlgebraicToIndex(alg);
+        if (IsValidIndex(idx)) InstantiateBishopAtIndex(idx);
+    }
+
+    void InstantiateBishopAtIndex(int index)
+    {
+        if (!IsValidIndex(index) || bishopPrefab == null) return;
+        ClearBishop();
+        var pos = squares[index].position + bishopPositionOffset;
+        pos.y = 0f;
+        _bishopInstance = Instantiate(bishopPrefab, pos, bishopPrefab.transform.rotation);
+        var piece = _bishopInstance.GetComponent<Piece>();
+        if (piece != null)
+        {
+            piece.position = new Vector2Int(index / 8, index % 8);
+            piece.isWhite = true;
+            piece.hasMoved = false;
+        }
+        if (boardManager?.boardPieces != null)
+        {
+            boardManager.boardPieces[index / 8, index % 8] = piece;
+        }
+
+        if (_bishopInstance.GetComponent<Collider>() == null)
+        {
+            var bc = _bishopInstance.AddComponent<SphereCollider>();
+            bc.radius = 0.3f;
+            bc.isTrigger = false;
+        }
+
+        if (_bishopInstance.GetComponent<TutorialPieceClickHandler>() == null)
+        {
+            var handler = _bishopInstance.AddComponent<TutorialPieceClickHandler>();
+            handler.manager = this;
+            handler.pieceIndex = index;
+        }
+    }
+
+    void InstantiateQueenAtAlgebraic(string alg)
+    {
+        int idx = AlgebraicToIndex(alg);
+        if (IsValidIndex(idx)) InstantiateQueenAtIndex(idx);
+    }
+
+    void InstantiateQueenAtIndex(int index)
+    {
+        if (!IsValidIndex(index) || queenPrefab == null) return;
+        ClearQueen();
+        var pos = squares[index].position + queenPositionOffset;
+        pos.y = 0f;
+        _queenInstance = Instantiate(queenPrefab, pos, queenPrefab.transform.rotation);
+        var piece = _queenInstance.GetComponent<Piece>();
+        if (piece != null)
+        {
+            piece.position = new Vector2Int(index / 8, index % 8);
+            piece.isWhite = true;
+            piece.hasMoved = false;
+        }
+        if (boardManager?.boardPieces != null)
+        {
+            boardManager.boardPieces[index / 8, index % 8] = piece;
+        }
+
+        if (_queenInstance.GetComponent<Collider>() == null)
+        {
+            var bc = _queenInstance.AddComponent<SphereCollider>();
+            bc.radius = 0.3f;
+            bc.isTrigger = false;
+        }
+
+        if (_queenInstance.GetComponent<TutorialPieceClickHandler>() == null)
+        {
+            var handler = _queenInstance.AddComponent<TutorialPieceClickHandler>();
+            handler.manager = this;
+            handler.pieceIndex = index;
+        }
+    }
+
+    void InstantiateKingAtAlgebraic(string alg)
+    {
+        int idx = AlgebraicToIndex(alg);
+        if (IsValidIndex(idx)) InstantiateKingAtIndex(idx);
+    }
+
+    void InstantiateKingAtIndex(int index)
+    {
+        if (!IsValidIndex(index) || kingPrefab == null) return;
+        ClearKing();
+        var pos = squares[index].position + kingPositionOffset;
+        pos.y = 0f;
+        _kingInstance = Instantiate(kingPrefab, pos, kingPrefab.transform.rotation);
+        var piece = _kingInstance.GetComponent<Piece>();
+        if (piece != null)
+        {
+            piece.position = new Vector2Int(index / 8, index % 8);
+            piece.isWhite = true;
+            piece.hasMoved = false;
+        }
+        if (boardManager?.boardPieces != null)
+        {
+            boardManager.boardPieces[index / 8, index % 8] = piece;
+        }
+
+        if (_kingInstance.GetComponent<Collider>() == null)
+        {
+            var bc = _kingInstance.AddComponent<SphereCollider>();
+            bc.radius = 0.3f;
+            bc.isTrigger = false;
+        }
+
+        if (_kingInstance.GetComponent<TutorialPieceClickHandler>() == null)
+        {
+            var handler = _kingInstance.AddComponent<TutorialPieceClickHandler>();
+            handler.manager = this;
+            handler.pieceIndex = index;
+        }
+    }
+
+    void InstantiateKnightAtAlgebraic(string alg)
+    {
+        int idx = AlgebraicToIndex(alg);
+        if (IsValidIndex(idx)) InstantiateKnightAtIndex(idx);
+    }
+
+    void InstantiateKnightAtIndex(int index)
+    {
+        if (!IsValidIndex(index) || knightPrefab == null) return;
+        ClearKnight();
+        var pos = squares[index].position + knightPositionOffset;
+        pos.y = 0f;
+        _knightInstance = Instantiate(knightPrefab, pos, knightPrefab.transform.rotation);
+        var piece = _knightInstance.GetComponent<Piece>();
+        if (piece != null)
+        {
+            piece.position = new Vector2Int(index / 8, index % 8);
+            piece.isWhite = true;
+            piece.hasMoved = false;
+        }
+        if (boardManager?.boardPieces != null)
+        {
+            boardManager.boardPieces[index / 8, index % 8] = piece;
+        }
+
+        if (_knightInstance.GetComponent<Collider>() == null)
+        {
+            var bc = _knightInstance.AddComponent<SphereCollider>();
+            bc.radius = 0.3f;
+            bc.isTrigger = false;
+        }
+
+        if (_knightInstance.GetComponent<TutorialPieceClickHandler>() == null)
+        {
+            var handler = _knightInstance.AddComponent<TutorialPieceClickHandler>();
+            handler.manager = this;
+            handler.pieceIndex = index;
+        }
+    }
+
+    void InstantiatePawnAtAlgebraic(string alg)
+    {
+        int idx = AlgebraicToIndex(alg);
+        if (IsValidIndex(idx)) InstantiatePawnAtIndex(idx);
+    }
+
+    void InstantiatePawnAtIndex(int index)
+    {
+        if (!IsValidIndex(index) || pawnPrefab == null) return;
+        ClearPawn();
+        var pos = squares[index].position + pawnPositionOffset;
+        pos.y = 0f;
+        _pawnInstance = Instantiate(pawnPrefab, pos, pawnPrefab.transform.rotation);
+        _pawnInstance.transform.localScale = new Vector3(32f, 32f, 32f);
+        foreach (Transform child in _pawnInstance.transform)
+        {
+            child.localScale = new Vector3(32f, 32f, 32f);
+        }
+        var piece = _pawnInstance.GetComponent<Piece>();
+        if (piece == null)
+        {
+            piece = _pawnInstance.AddComponent<Piece>();
+        }
+        // Ensure PawnPiece script is present for proper move generation
+        var pawnPiece = _pawnInstance.GetComponent<PawnPiece>();
+        if (pawnPiece == null)
+        {
+            pawnPiece = _pawnInstance.AddComponent<PawnPiece>();
+        }
+        if (piece != null)
+        {
+            piece.position = new Vector2Int(index / 8, index % 8);
+            piece.isWhite = true;
+            piece.hasMoved = true;  // Set to true so pawn only moves 1 square, not 2 from starting position
+            piece.type = PieceType.Pawn;  // Set the piece type
+        }
+        if (boardManager?.boardPieces != null)
+        {
+            boardManager.boardPieces[index / 8, index % 8] = piece;
+        }
+
+        if (_pawnInstance.GetComponent<Collider>() == null)
+        {
+            var bc = _pawnInstance.AddComponent<SphereCollider>();
+            bc.radius = 0.3f;
+            bc.isTrigger = false;
+        }
+
+        if (_pawnInstance.GetComponent<TutorialPieceClickHandler>() == null)
+        {
+            var handler = _pawnInstance.AddComponent<TutorialPieceClickHandler>();
+            handler.manager = this;
+            handler.pieceIndex = index;
+        }
+    }
+
+    int GetIndexFromTransform(Transform t)
+    {
+        if (t == null || squares == null || squares.Length != 64) return -1;
+        for (int i = 0; i < 64; i++)
+            if (squares[i] == t) return i;
+        return -1;
+    }
+
+    void CreateHighlightsFromTransforms(Transform[] targets)
+    {
+        if (targets == null) return;
+        _tutorialTargets.Clear();
+        _visitedTargets.Clear();
+        foreach (var t in targets)
+        {
+            int idx = GetIndexFromTransform(t);
+            if (IsValidIndex(idx)) ShowHighlightAtIndex(idx);
+        }
+    }
+
+    void CreateHighlightsLayer2()
+    {
+        if (highlightTransformsLayer2 == null || highlightTransformsLayer2.Length == 0) return;
+        foreach (var t in highlightTransformsLayer2)
+        {
+            int idx = GetIndexFromTransform(t);
+            if (IsValidIndex(idx)) ShowHighlightAtIndexLayer2(idx);
+        }
+    }
+
+    void CreateHighlightsLayer2FromTransforms(Transform[] targets)
+    {
+        if (targets == null) return;
+        foreach (var t in targets)
+        {
+            int idx = GetIndexFromTransform(t);
+            if (IsValidIndex(idx)) ShowHighlightAtIndexLayer2(idx);
+        }
+    }
+
+    int AlgebraicToIndex(string alg)
+    {
+        if (string.IsNullOrEmpty(alg) || alg.Length < 2) return -1;
+        int file = char.ToLower(alg[0]) - 'a';
+        int rank = alg[1] - '1';
+        if (file < 0 || file > 7 || rank < 0 || rank > 7) return -1;
+        return rank * 8 + file;
+    }
+
+    public void ClearHighlights()
+    {
+        foreach (var h in _highlights)
+            if (h != null)
+                Destroy(h);
+        _highlights.Clear();
+        _tutorialTargets.Clear();
+        _visitedTargets.Clear();
+    }
+
+    public void ClearLegalMoveHighlights()
+    {
+        // Remove only the legal move highlights (those that are not tutorial targets)
+        List<GameObject> toRemove = new List<GameObject>();
+        foreach (var h in _highlights)
+        {
+            if (h != null)
+            {
+                var th = h.GetComponent<TutorialHighlight>();
+                if (th != null && !_tutorialTargets.Contains(th.index))
+                {
+                    toRemove.Add(h);
+                    Destroy(h);
+                }
+            }
+        }
+        
+        // Remove destroyed highlights from the list
+        foreach (var h in toRemove)
+        {
+            _highlights.Remove(h);
+        }
+    }
+
+    public void ClearRook()
+    {
+        if (_rookInstance == null) return;
+        var piece = _rookInstance.GetComponent<Piece>();
+        if (piece != null && boardManager?.boardPieces != null)
+        {
+            var r = piece.position.x;
+            var c = piece.position.y;
+            if (r >= 0 && r < 8 && c >= 0 && c < 8 && boardManager.boardPieces[r, c] == piece)
+                boardManager.boardPieces[r, c] = null;
+        }
+
+        Destroy(_rookInstance);
+        _rookInstance = null;
+    }
+
+    public void ClearBishop()
+    {
+        if (_bishopInstance == null) return;
+        var piece = _bishopInstance.GetComponent<Piece>();
+        if (piece != null && boardManager?.boardPieces != null)
+        {
+            var r = piece.position.x;
+            var c = piece.position.y;
+            if (r >= 0 && r < 8 && c >= 0 && c < 8 && boardManager.boardPieces[r, c] == piece)
+                boardManager.boardPieces[r, c] = null;
+        }
+
+        Destroy(_bishopInstance);
+        _bishopInstance = null;
+    }
+
+    public void ClearQueen()
+    {
+        if (_queenInstance == null) return;
+        var piece = _queenInstance.GetComponent<Piece>();
+        if (piece != null && boardManager?.boardPieces != null)
+        {
+            var r = piece.position.x;
+            var c = piece.position.y;
+            if (r >= 0 && r < 8 && c >= 0 && c < 8 && boardManager.boardPieces[r, c] == piece)
+                boardManager.boardPieces[r, c] = null;
+        }
+
+        Destroy(_queenInstance);
+        _queenInstance = null;
+    }
+
+    public void ClearKing()
+    {
+        if (_kingInstance == null) return;
+        var piece = _kingInstance.GetComponent<Piece>();
+        if (piece != null && boardManager?.boardPieces != null)
+        {
+            var r = piece.position.x;
+            var c = piece.position.y;
+            if (r >= 0 && r < 8 && c >= 0 && c < 8 && boardManager.boardPieces[r, c] == piece)
+                boardManager.boardPieces[r, c] = null;
+        }
+
+        Destroy(_kingInstance);
+        _kingInstance = null;
+    }
+
+    public void ClearKnight()
+    {
+        if (_knightInstance == null) return;
+        var piece = _knightInstance.GetComponent<Piece>();
+        if (piece != null && boardManager?.boardPieces != null)
+        {
+            var r = piece.position.x;
+            var c = piece.position.y;
+            if (r >= 0 && r < 8 && c >= 0 && c < 8 && boardManager.boardPieces[r, c] == piece)
+                boardManager.boardPieces[r, c] = null;
+        }
+
+        Destroy(_knightInstance);
+        _knightInstance = null;
+    }
+
+    public void ClearPawn()
+    {
+        if (_pawnInstance == null) return;
+        var piece = _pawnInstance.GetComponent<Piece>();
+        if (piece != null && boardManager?.boardPieces != null)
+        {
+            var r = piece.position.x;
+            var c = piece.position.y;
+            if (r >= 0 && r < 8 && c >= 0 && c < 8 && boardManager.boardPieces[r, c] == piece)
+                boardManager.boardPieces[r, c] = null;
+        }
+
+        Destroy(_pawnInstance);
+        _pawnInstance = null;
+    }
+
+    string IndexToAlgebraic(int index)
+    {
+        if (!IsValidIndex(index)) return string.Empty;
+        int file = index % 8, rank = index / 8;
+        return string.Concat((char)('a' + file), (char)('1' + rank));
+    }
+
+    bool IsValidIndex(int idx) =>
+        squares != null && squares.Length == 64 && idx >= 0 && idx < 64 && squares[idx] != null;
+
+    bool LocalPlayerWon(GameState state)
+    {
+        bool localIsWhite = ChessNetworkManager.LocalInstance != null
+            ? ChessNetworkManager.LocalInstance.isWhitePlayer
+            : true;
+        return (state == GameState.WhiteWins && localIsWhite) || (state == GameState.BlackWins && !localIsWhite);
+    }
+
+    void SetLayerRecursively(GameObject go, int layer)
+    {
+        if (go == null) return;
+        go.layer = layer;
+        foreach (Transform t in go.transform) SetLayerRecursively(t.gameObject, layer);
+    }
+
+    void SetCanvas(Canvas c, bool active)
+    {
+        if (c == null) return;
+        c.gameObject.SetActive(active);
+    }
+
+    List<Vector2Int> GenerateRookMoves(Vector2Int pos, bool isWhite)
+    {
+        var moves = new List<Vector2Int>();
+        if (boardManager?.boardPieces == null) return moves;
+        Vector2Int[] dirs = { new Vector2Int(1,0), new Vector2Int(-1,0), new Vector2Int(0,1), new Vector2Int(0,-1)};
+        foreach (var d in dirs)
+        {
+            Vector2Int cur = pos + d;
+            while (Piece.IsInBounds(cur))
+            {
+                var p = boardManager.boardPieces[cur.x, cur.y];
+                if (p == null)
+                {
+                    moves.Add(cur);
+                }
+                else
+                {
+                    if (p.isWhite != isWhite) moves.Add(cur);
+                    break;
+                }
+                cur += d;
+            }
+        }
+        return moves;
+    }
+
+    List<Vector2Int> GenerateBishopMoves(Vector2Int pos, bool isWhite)
+    {
+        var moves = new List<Vector2Int>();
+        if (boardManager?.boardPieces == null) return moves;
+        Vector2Int[] dirs = { new Vector2Int(1,1), new Vector2Int(1,-1), new Vector2Int(-1,1), new Vector2Int(-1,-1)};
+        foreach (var d in dirs)
+        {
+            Vector2Int cur = pos + d;
+            while (Piece.IsInBounds(cur))
+            {
+                var p = boardManager.boardPieces[cur.x, cur.y];
+                if (p == null)
+                {
+                    moves.Add(cur);
+                }
+                else
+                {
+                    if (p.isWhite != isWhite) moves.Add(cur);
+                    break;
+                }
+                cur += d;
+            }
+        }
+        return moves;
+    }
+
+    List<Vector2Int> GenerateQueenMoves(Vector2Int pos, bool isWhite)
+    {
+        var set = new HashSet<Vector2Int>();
+        foreach (var m in GenerateRookMoves(pos, isWhite)) set.Add(m);
+        foreach (var m in GenerateBishopMoves(pos, isWhite)) set.Add(m);
+        return new List<Vector2Int>(set);
+    }
+
+    List<Vector2Int> GenerateKingMoves(Vector2Int pos, bool isWhite)
+    {
+        var moves = new List<Vector2Int>();
+        if (boardManager?.boardPieces == null) return moves;
+        
+        // King moves one square in any direction
+        for (int dx = -1; dx <= 1; dx++)
+        {
+            for (int dy = -1; dy <= 1; dy++)
+            {
+                if (dx == 0 && dy == 0) continue;
+                
+                Vector2Int target = new Vector2Int(pos.x + dx, pos.y + dy);
+                if (Piece.IsInBounds(target))
+                {
+                    var p = boardManager.boardPieces[target.x, target.y];
+                    if (p == null || p.isWhite != isWhite)
+                    {
+                        moves.Add(target);
+                    }
+                }
+            }
+        }
+        return moves;
+    }
+
+    List<Vector2Int> GenerateKnightMoves(Vector2Int pos, bool isWhite)
+    {
+        var moves = new List<Vector2Int>();
+        if (boardManager?.boardPieces == null) return moves;
+        
+        // Knight moves in L-shape: 2 squares in one direction, 1 square perpendicular
+        int[] dx = { 2, 2, -2, -2, 1, 1, -1, -1 };
+        int[] dy = { 1, -1, 1, -1, 2, -2, 2, -2 };
+        
+        for (int i = 0; i < 8; i++)
+        {
+            Vector2Int target = new Vector2Int(pos.x + dx[i], pos.y + dy[i]);
+            if (Piece.IsInBounds(target))
+            {
+                var p = boardManager.boardPieces[target.x, target.y];
+                if (p == null || p.isWhite != isWhite)
+                {
+                    moves.Add(target);
+                }
+            }
+        }
+        return moves;
+    }
+
+    List<Vector2Int> GeneratePawnMoves(Vector2Int pos, bool isWhite, bool hasMoved)
+    {
+        var moves = new List<Vector2Int>();
+        if (boardManager?.boardPieces == null) return moves;
+        
+        // Pawn moves forward (white goes up, black goes down)
+        int direction = isWhite ? 1 : -1;
+        
+        // One square forward
+        Vector2Int forward = new Vector2Int(pos.x + direction, pos.y);
+        if (Piece.IsInBounds(forward) && boardManager.boardPieces[forward.x, forward.y] == null)
+        {
+            moves.Add(forward);
+            
+            // Two squares forward from starting position
+            if (!hasMoved)
+            {
+                Vector2Int doubleForward = new Vector2Int(pos.x + 2 * direction, pos.y);
+                if (Piece.IsInBounds(doubleForward) && boardManager.boardPieces[doubleForward.x, doubleForward.y] == null)
+                {
+                    moves.Add(doubleForward);
+                }
+            }
+        }
+        
+        // Diagonal captures
+        Vector2Int leftCapture = new Vector2Int(pos.x + direction, pos.y - 1);
+        if (Piece.IsInBounds(leftCapture))
+        {
+            var p = boardManager.boardPieces[leftCapture.x, leftCapture.y];
+            if (p != null && p.isWhite != isWhite)
+            {
+                moves.Add(leftCapture);
+            }
+        }
+        
+        Vector2Int rightCapture = new Vector2Int(pos.x + direction, pos.y + 1);
+        if (Piece.IsInBounds(rightCapture))
+        {
+            var p = boardManager.boardPieces[rightCapture.x, rightCapture.y];
+            if (p != null && p.isWhite != isWhite)
+            {
+                moves.Add(rightCapture);
+            }
+        }
+        
+        return moves;
+    }
+}
+

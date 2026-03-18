@@ -2,8 +2,8 @@ using UnityEngine;
 using Mirror;
 
 /// <summary>
-/// Attached to each piece during battle.
-/// Tracks HP server-side and notifies BattleChessManager on death.
+/// HP-Verwaltung fuer eine Figur im FPS-Kampf.
+/// Schaden wird lokal registriert und ueber BattleChessManager server-seitig verarbeitet.
 /// </summary>
 public class FPSHealth : NetworkBehaviour
 {
@@ -11,9 +11,8 @@ public class FPSHealth : NetworkBehaviour
     public float currentHealth;
 
     private float maxHealth;
-    private bool isDead = false;
+    private bool  isDead = false;
 
-    // Which piece this health belongs to
     [HideInInspector] public Piece ownerPiece;
 
     public void Initialize(float max)
@@ -24,10 +23,22 @@ public class FPSHealth : NetworkBehaviour
     }
 
     /// <summary>
-    /// Called server-side only when this figure takes damage.
+    /// Wird lokal vom FPSWeapon aufgerufen.
+    /// Schickt Schaden ueber BattleChessManager zum Server.
+    /// </summary>
+    public void TakeDamageLocal(float amount)
+    {
+        if (isDead) return;
+
+        // Ueber BattleChessManager server-seitig verarbeiten
+        BattleChessManager.Instance?.CmdApplyDamage(ownerPiece.position.x, ownerPiece.position.y, amount);
+    }
+
+    /// <summary>
+    /// Wird vom Server aufgerufen um HP zu reduzieren.
     /// </summary>
     [Server]
-    public void TakeDamage(float amount)
+    public void ApplyDamage(float amount)
     {
         if (isDead) return;
 
@@ -39,16 +50,14 @@ public class FPSHealth : NetworkBehaviour
         if (currentHealth <= 0f)
         {
             isDead = true;
-            // Tell BattleChessManager this figure died
             BattleChessManager.Instance?.OnFigureDied(ownerPiece);
         }
     }
 
-    // Fires on all clients when HP changes — use this to update health bar UI later
     private void OnHealthChanged(float oldVal, float newVal)
     {
         Debug.Log($"[FPSHealth] HP updated: {newVal}/{maxHealth}");
-        // TODO: update health bar UI here when ready
+        // TODO: Health Bar UI hier updaten
     }
 
     public float GetHealthPercent()

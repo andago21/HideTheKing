@@ -3,25 +3,23 @@ using Mirror;
 using System.Collections.Generic;
 
 /// <summary>
-/// Main coordinator for Battle Chess FPS mode.
+/// Koordiniert den Battle Chess FPS Modus.
+/// Spawnt unsichtbare FPS-Koerper neben den Figuren statt die Figuren selbst zu bewegen.
 /// </summary>
 public class BattleChessManager : NetworkBehaviour
 {
     public static BattleChessManager Instance;
 
     [Header("Battle Settings")]
-    [Tooltip("How far apart the two figures are placed when battle starts")]
     public float battleStartDistance = 3f;
+    public float cameraHeightOffset  = 1.6f;
 
-    [Tooltip("Camera height above figure base")]
-    public float cameraHeightOffset = 1.5f;
-
-    // Internal state
     private Piece _attacker;
     private Piece _defender;
     private bool  _battleActive = false;
 
-    private List<GameObject> _hiddenObjects = new List<GameObject>();
+    private List<GameObject> _hiddenObjects   = new List<GameObject>();
+    private GameObject       _localFPSBody    = null; // unsichtbarer FPS-Koerper
 
     private void Awake()
     {
@@ -29,16 +27,13 @@ public class BattleChessManager : NetworkBehaviour
         else Destroy(gameObject);
     }
 
-    /// <summary>
-    /// Called from PlayerInput.MovePiece() when a capture is detected in multiplayer.
-    /// </summary>
     public void RequestBattle(Piece attacker, Piece defender)
     {
         if (!isServer)
         {
             CmdRequestBattle(
-                attacker.GetComponent<NetworkIdentity>().netId,
-                defender.GetComponent<NetworkIdentity>().netId
+                attacker.position.x, attacker.position.y,
+                defender.position.x, defender.position.y
             );
         }
         else
@@ -48,13 +43,16 @@ public class BattleChessManager : NetworkBehaviour
     }
 
     [Command(requiresAuthority = false)]
-    private void CmdRequestBattle(uint attackerNetId, uint defenderNetId)
+    private void CmdRequestBattle(int ax, int ay, int dx, int dy)
     {
-        if (NetworkServer.spawned.TryGetValue(attackerNetId, out NetworkIdentity aId) &&
-            NetworkServer.spawned.TryGetValue(defenderNetId, out NetworkIdentity dId))
-        {
-            ServerStartBattle(aId.GetComponent<Piece>(), dId.GetComponent<Piece>());
-        }
+        BoardManager board = FindObjectOfType<BoardManager>();
+        if (board == null) return;
+
+        Piece attacker = board.boardPieces[ax, ay];
+        Piece defender = board.boardPieces[dx, dy];
+        if (attacker == null || defender == null) return;
+
+        ServerStartBattle(attacker, defender);
     }
 
     [Server]
@@ -69,74 +67,77 @@ public class BattleChessManager : NetworkBehaviour
         Debug.Log($"[BattleChess] {attacker.type} vs {defender.type}");
 
         RpcSetupBattle(
-            attacker.GetComponent<NetworkIdentity>().netId,
-            defender.GetComponent<NetworkIdentity>().netId
+            attacker.position.x, attacker.position.y,
+            defender.position.x, defender.position.y
         );
     }
 
     [ClientRpc]
-    private void RpcSetupBattle(uint attackerNetId, uint defenderNetId)
+    private void RpcSetupBattle(int ax, int ay, int dx, int dy)
     {
-        if (!NetworkServer.spawned.TryGetValue(attackerNetId, out NetworkIdentity aId)) return;
-        if (!NetworkServer.spawned.TryGetValue(defenderNetId, out NetworkIdentity dId)) return;
+        BoardManager board = FindObjectOfType<BoardManager>();
+        if (board == null) return;
 
-        Piece attacker = aId.GetComponent<Piece>();
-        Piece defender = dId.GetComponent<Piece>();
+        Piece attacker = board.boardPieces[ax, ay];
+        Piece defender = board.boardPieces[dx, dy];
+        if (attacker == null || defender == null) return;
 
-        // ── 1. Get the shared camera and save its chess state ──
+        // 1. Kamera speichern
         ChessCameraController camCtrl = FindObjectOfType<ChessCameraController>();
-        if (camCtrl == null)
-        {
-            Debug.LogError("[BattleChess] ChessCameraController not found!");
-            return;
-        }
+        if (camCtrl == null) { Debug.LogError("[BattleChess] ChessCameraController not found!"); return; }
         camCtrl.SaveAndDisableForFPS();
         Camera mainCam = camCtrl.GetMainCamera();
 
-        // ── 2. Hide all other pieces ──
+        // 2. Andere Figuren ausblenden
         HideOtherPieces(attacker, defender);
 
-        // ── 3. Disable normal player input ──
+        // 3. Input deaktivieren
         PlayerInput input = FindObjectOfType<PlayerInput>();
         if (input != null) input.enabled = false;
 
-        // ── 4. Figure out which piece the local player controls ──
-        ChessNetworkManager localMgr = ChessNetworkManager.LocalInstance;
-        if (localMgr == null) return;
-
-        bool localIsWhite   = localMgr.isWhitePlayer;
-        Piece myFigure      = (attacker.isWhite == localIsWhite) ? attacker : defender;
-        Piece enemyFigure   = (myFigure == attacker)             ? defender : attacker;
-
-        // ── 5. Calculate positions ──
+        // 4. Positionen berechnen
         Vector3 center      = (attacker.transform.position + defender.transform.position) / 2f;
         Vector3 direction   = (defender.transform.position - attacker.transform.position).normalized;
         direction.y         = 0;
+        if (direction == Vector3.zero) direction = Vector3.forward;
 
         Vector3 attackerPos = center - direction * (battleStartDistance / 2f);
         Vector3 defenderPos = center + direction * (battleStartDistance / 2f);
-        attackerPos.y       = attacker.transform.position.y;
-        defenderPos.y       = defender.transform.position.y;
+        // Y auf Bretthöhe setzen
+        attackerPos.y = attacker.transform.position.y;
+        defenderPos.y = defender.transform.position.y;
 
-        Vector3 myPos       = (myFigure == attacker) ? attackerPos : defenderPos;
-        Vector3 enemyPos    = (myFigure == attacker) ? defenderPos : attackerPos;
+        // 5. Lokalen Spieler bestimmen
+        ChessNetworkManager localMgr = ChessNetworkManager.LocalInstance;
+        if (localMgr == null) return;
 
-        // ── 6. Set up FPS on my figure only ──
-        SetupFPSOnFigure(myFigure, mainCam, myPos, enemyPos);
+        bool localIsWhite = localMgr.isWhitePlayer;
+        Piece myFigure    = (attacker.isWhite == localIsWhite) ? attacker : defender;
+        Piece enemyFigure = (myFigure == attacker)             ? defender : attacker;
+
+        Vector3 myPos    = (myFigure == attacker) ? attackerPos : defenderPos;
+        Vector3 enemyPos = (myFigure == attacker) ? defenderPos : attackerPos;
+
+        // 6. Stats für meine Figur
+        FigureStats stats = myFigure.GetComponent<FigureStats>();
+        if (stats == null)
+        {
+            stats = myFigure.gameObject.AddComponent<FigureStats>();
+            stats.ApplyDefaults(myFigure.type);
+        }
+
+        // 7. HP auf beiden Figuren initialisieren
+        SetupHealth(attacker, ax, ay);
+        SetupHealth(defender, dx, dy);
+
+        // 8. Unsichtbaren FPS-Körper erstellen
+        _localFPSBody = CreateFPSBody(myPos, enemyPos, mainCam, stats, myFigure.transform);
 
         Debug.Log($"[BattleChess] Setup complete. I am {myFigure.type}, facing {enemyFigure.type}");
     }
 
-    private void SetupFPSOnFigure(Piece figure, Camera mainCam, Vector3 myPos, Vector3 enemyPos)
+    private void SetupHealth(Piece figure, int row, int col)
     {
-        // Add CharacterController
-        CharacterController cc = figure.GetComponent<CharacterController>();
-        if (cc == null) cc = figure.gameObject.AddComponent<CharacterController>();
-        cc.height = 2f;
-        cc.radius = 0.3f;
-        cc.center = new Vector3(0, 1f, 0);
-
-        // Get or apply stats
         FigureStats stats = figure.GetComponent<FigureStats>();
         if (stats == null)
         {
@@ -144,28 +145,74 @@ public class BattleChessManager : NetworkBehaviour
             stats.ApplyDefaults(figure.type);
         }
 
-        // Add FPSHealth
         FPSHealth health = figure.GetComponent<FPSHealth>();
         if (health == null) health = figure.gameObject.AddComponent<FPSHealth>();
         health.ownerPiece = figure;
         health.Initialize(stats.maxHealth);
-
-        // Add FPSController
-        FPSController ctrl = figure.GetComponent<FPSController>();
-        if (ctrl == null) ctrl = figure.gameObject.AddComponent<FPSController>();
-        ctrl.Initialize(mainCam, stats.moveSpeed, stats.mouseSensitivity);
-        ctrl.PlaceAtPosition(myPos, enemyPos);
-        ctrl.SetBattleActive(true);
-
-        // Add FPSWeapon
-        FPSWeapon weapon = figure.GetComponent<FPSWeapon>();
-        if (weapon == null) weapon = figure.gameObject.AddComponent<FPSWeapon>();
-        weapon.fpsCamera = mainCam;
-        weapon.Initialize(stats, mainCam);
-        weapon.SetBattleActive(true);
     }
 
-    // ── Called by FPSHealth when HP reaches 0 ──
+    /// <summary>
+    /// Erstellt einen unsichtbaren Capsule-Körper als FPS-Charakter.
+    /// Die Schachfigur selbst wird nicht bewegt.
+    /// </summary>
+    private GameObject CreateFPSBody(Vector3 position, Vector3 lookAt, Camera cam, FigureStats stats, Transform myFigure)
+    {
+        // Unsichtbarer Körper
+        GameObject body    = new GameObject("FPSBody_Local");
+        body.layer         = LayerMask.NameToLayer("Default");
+
+        // CharacterController
+        CharacterController cc = body.AddComponent<CharacterController>();
+        cc.height = 1.8f;
+        cc.radius = 0.3f;
+        cc.center = new Vector3(0, 0.9f, 0);
+
+        // Position setzen
+        body.transform.position = position;
+
+        // Richtung zum Gegner
+        Vector3 dir = lookAt - position;
+        dir.y = 0;
+        if (dir != Vector3.zero)
+            body.transform.rotation = Quaternion.LookRotation(dir);
+
+        // FPSController hinzufügen
+        FPSController ctrl = body.AddComponent<FPSController>();
+        ctrl.figureToFollow = myFigure;
+        ctrl.Initialize(cam, stats.moveSpeed, stats.mouseSensitivity);
+        ctrl.PlaceAtPosition(position, lookAt);
+        ctrl.SetBattleActive(true);
+
+        // FPSWeapon hinzufügen
+        FPSWeapon weapon = body.AddComponent<FPSWeapon>();
+        weapon.fpsCamera = cam;
+        weapon.damage      = stats.damage;
+        weapon.fireRate    = stats.fireRate;
+        weapon.bulletRange = stats.bulletRange;
+        weapon.SetBattleActive(true);
+
+        return body;
+    }
+
+
+    /// <summary>
+    /// Wird lokal von FPSHealth aufgerufen — sendet Schaden zum Server.
+    /// BattleChessManager hat eine NetworkIdentity, kann also Commands senden.
+    /// </summary>
+    [Command(requiresAuthority = false)]
+    public void CmdApplyDamage(int row, int col, float amount)
+    {
+        BoardManager board = FindObjectOfType<BoardManager>();
+        if (board == null) return;
+
+        Piece figure = board.boardPieces[row, col];
+        if (figure == null) return;
+
+        FPSHealth health = figure.GetComponent<FPSHealth>();
+        if (health != null)
+            health.ApplyDamage(amount);
+    }
+
     [Server]
     public void OnFigureDied(Piece deadPiece)
     {
@@ -177,72 +224,101 @@ public class BattleChessManager : NetworkBehaviour
         Debug.Log($"[BattleChess] {deadPiece.type} died. AttackerDied={attackerDied}");
 
         RpcEndBattle(
-            _attacker.GetComponent<NetworkIdentity>().netId,
-            _defender.GetComponent<NetworkIdentity>().netId,
+            _attacker.position.x, _attacker.position.y,
+            _defender.position.x, _defender.position.y,
             attackerDied
         );
     }
 
     [ClientRpc]
-    private void RpcEndBattle(uint attackerNetId, uint defenderNetId, bool attackerDied)
+    private void RpcEndBattle(int ax, int ay, int dx, int dy, bool attackerDied)
     {
-        if (!NetworkServer.spawned.TryGetValue(attackerNetId, out NetworkIdentity aId)) return;
-        if (!NetworkServer.spawned.TryGetValue(defenderNetId, out NetworkIdentity dId)) return;
+        BoardManager board = FindObjectOfType<BoardManager>();
+        if (board == null) return;
 
-        Piece attacker = aId.GetComponent<Piece>();
-        Piece defender = dId.GetComponent<Piece>();
+        Piece attacker = board.boardPieces[ax, ay];
+        Piece defender = board.boardPieces[dx, dy];
 
-        // ── 1. Clean up FPS components from both figures ──
-        CleanupFPS(attacker);
-        CleanupFPS(defender);
+        // 1. FPS-Körper zerstören
+        if (_localFPSBody != null)
+        {
+            Destroy(_localFPSBody);
+            _localFPSBody = null;
+        }
 
-        // ── 2. Restore chess camera ──
+        // 2. Health-Komponenten entfernen
+        CleanupHealth(attacker);
+        CleanupHealth(defender);
+
+        // 3. Stats entfernen
+        CleanupStats(attacker);
+        CleanupStats(defender);
+
+        // 4. Kamera wiederherstellen
         ChessCameraController camCtrl = FindObjectOfType<ChessCameraController>();
         if (camCtrl != null) camCtrl.RestoreFromFPS();
 
-        // ── 3. Apply chess board result ──
-        BoardManager board = FindObjectOfType<BoardManager>();
+        // 5. Schachbrett-Ergebnis anwenden
         if (board != null)
         {
             if (!attackerDied)
             {
-                // Attacker won — move attacker to defender's square, remove defender
-                Vector2Int newPos = defender.position;
-
-                board.boardPieces[defender.position.x, defender.position.y] = null;
-                board.SendToSide(defender);
-
-                board.boardPieces[attacker.position.x, attacker.position.y] = null;
-                board.boardPieces[newPos.x, newPos.y] = attacker;
-                attacker.position  = newPos;
-                attacker.hasMoved  = true;
-
-                Vector3 targetWorld = board.squares[newPos.x * 8 + newPos.y].position;
-                attacker.transform.position = targetWorld;
-
-                Debug.Log($"[BattleChess] Attacker won — {attacker.type} moved to {newPos}");
+                Vector2Int newPos = new Vector2Int(dx, dy);
+                if (defender != null)
+                {
+                    board.boardPieces[dx, dy] = null;
+                    board.SendToSide(defender);
+                }
+                if (attacker != null)
+                {
+                    board.boardPieces[ax, ay] = null;
+                    board.boardPieces[dx, dy] = attacker;
+                    attacker.position         = newPos;
+                    attacker.hasMoved         = true;
+                    // Snap zur korrekten Brett-Position — FPSBody hat sie verschoben
+                    Vector3 correctPos = board.squares[dx * 8 + dy].position;
+                    correctPos.y = attacker.transform.position.y;
+                    attacker.transform.position = correctPos;
+                }
+                Debug.Log("[BattleChess] Attacker won");
             }
             else
             {
-                // Defender won — attacker is removed, defender stays
-                board.boardPieces[attacker.position.x, attacker.position.y] = null;
-                board.SendToSide(attacker);
-
-                Debug.Log($"[BattleChess] Defender won — {defender.type} stays at {defender.position}");
+                if (attacker != null)
+                {
+                    board.boardPieces[ax, ay] = null;
+                    board.SendToSide(attacker);
+                }
+                // Defender bleibt auf seinem Feld — snap zur korrekten Position
+                if (defender != null)
+                {
+                    Vector3 correctPos = board.squares[dx * 8 + dy].position;
+                    correctPos.y = defender.transform.position.y;
+                    defender.transform.position = correctPos;
+                }
+                Debug.Log("[BattleChess] Defender won");
             }
 
-            // Switch turns
-            board.isWhiteTurn = !board.isWhiteTurn;
+            // Turn-Wechsel: nur der Host setzt isWhiteTurn
+            // Der Angreifer hat den Zug gemacht — nach dem Kampf ist der Gegner dran
+            // PlayerInput hat den Turn NICHT umgeschaltet (wegen early return)
+            // Also schalten wir hier genau einmal um
+            if (NetworkServer.active)
+                board.isWhiteTurn = !board.isWhiteTurn;
         }
 
-        // ── 4. Restore hidden pieces ──
+        // 6. Andere Figuren wiederherstellen
         RestoreHiddenPieces();
 
-        // ── 5. Re-enable player input ──
+        // 7. Input wiederherstellen
         PlayerInput input = FindObjectOfType<PlayerInput>();
         if (input != null) input.enabled = true;
 
-        Debug.Log("[BattleChess] Board restored. Normal chess resumed.");
+        // 8. Cursor zurücksetzen
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible   = true;
+
+        Debug.Log("[BattleChess] Normal chess resumed.");
     }
 
     private void HideOtherPieces(Piece attacker, Piece defender)
@@ -264,20 +340,17 @@ public class BattleChessManager : NetworkBehaviour
         _hiddenObjects.Clear();
     }
 
-    private void CleanupFPS(Piece figure)
+    private void CleanupHealth(Piece figure)
     {
         if (figure == null) return;
+        FPSHealth h = figure.GetComponent<FPSHealth>();
+        if (h != null) Destroy(h);
+    }
 
-        FPSController ctrl = figure.GetComponent<FPSController>();
-        if (ctrl != null) { ctrl.SetBattleActive(false); Destroy(ctrl); }
-
-        FPSWeapon weapon = figure.GetComponent<FPSWeapon>();
-        if (weapon != null) { weapon.SetBattleActive(false); Destroy(weapon); }
-
-        FPSHealth health = figure.GetComponent<FPSHealth>();
-        if (health != null) Destroy(health);
-
-        CharacterController cc = figure.GetComponent<CharacterController>();
-        if (cc != null) Destroy(cc);
+    private void CleanupStats(Piece figure)
+    {
+        if (figure == null) return;
+        FigureStats s = figure.GetComponent<FigureStats>();
+        if (s != null) Destroy(s);
     }
 }

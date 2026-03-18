@@ -197,8 +197,28 @@ public class PlayerInput : MonoBehaviour
         // Capture
         if (targetPiece != null)
         {
-            if (captureEffectPrefab != null) Instantiate(captureEffectPrefab, targetPos, Quaternion.identity);
-            boardManager.SendToSide(targetPiece);
+            // Check if Battle Chess mode should trigger
+            bool useBattleChess = BattleChessManager.Instance != null &&
+                                  ChessNetworkManager.LocalInstance != null &&
+                                  ChessNetworkManager.LocalInstance.IsMultiplayer();
+ 
+            if (useBattleChess)
+            {
+                // ── BATTLE CHESS: hand off to BattleChessManager ──
+                // Do NOT move the attacker yet — BattleChessManager handles board update after battle
+                BattleChessManager.Instance.RequestBattle(piece, targetPiece);
+ 
+                // Early return — BattleChessManager takes over from here
+                // It will update the board, restore pieces, and switch turns after the fight
+                ClearSelection();
+                return;
+            }
+            else
+            {
+                // ── NORMAL capture (singleplayer or battle chess disabled) ──
+                if (captureEffectPrefab != null) Instantiate(captureEffectPrefab, targetPos, Quaternion.identity);
+                boardManager.SendToSide(targetPiece);
+            }
         }
         else
         {
@@ -322,11 +342,15 @@ public class PlayerInput : MonoBehaviour
 
     private void PromotePawn(Piece pawn, Vector2Int target)
     {
-        Destroy(pawn.gameObject);
-
+        // ── CHANGED: NetworkServer.Destroy statt Destroy damit Mirror es weiss ──
+        if (Mirror.NetworkServer.active)
+            Mirror.NetworkServer.Destroy(pawn.gameObject);
+        else
+            Destroy(pawn.gameObject);
+ 
         PieceType[] promotionOptions = { PieceType.Queen, PieceType.Rook, PieceType.Bishop, PieceType.Knight };
         PieceType randomType = promotionOptions[Random.Range(0, promotionOptions.Length)];
-
+ 
         GameObject promotionPrefab = null;
         switch (randomType)
         {
@@ -343,21 +367,25 @@ public class PlayerInput : MonoBehaviour
                 promotionPrefab = pawn.isWhite ? boardManager.whiteKnight : boardManager.blackKnight;
                 break;
         }
-
+ 
         Vector3 pos = boardManager.squares[target.x * 8 + target.y].position;
         pos.y = promotionPrefab.transform.position.y;
-
+ 
         GameObject promotionObj = Instantiate(promotionPrefab, pos, promotionPrefab.transform.rotation);
         Piece promotionPiece = promotionObj.GetComponent<Piece>();
-
+ 
         if (promotionPiece != null)
         {
-            promotionPiece.isWhite = pawn.isWhite;
-            promotionPiece.type = randomType;
+            promotionPiece.isWhite  = pawn.isWhite;
+            promotionPiece.type     = randomType;
             promotionPiece.position = target;
             boardManager.boardPieces[target.x, target.y] = promotionPiece;
         }
-
+ 
+        // ── CHANGED: NetworkServer.Spawn damit Client die neue Figur sieht ──
+        if (Mirror.NetworkServer.active)
+            Mirror.NetworkServer.Spawn(promotionObj);
+ 
         Debug.Log("Pawn promoted to " + randomType + "!");
     }
 

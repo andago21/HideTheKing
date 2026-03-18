@@ -4,7 +4,7 @@ using Mirror;
 public class ChessNetworkManager : NetworkBehaviour
 {
     private static ChessNetworkManager _localInstance;
-    
+
     public static ChessNetworkManager LocalInstance
     {
         get
@@ -24,28 +24,25 @@ public class ChessNetworkManager : NetworkBehaviour
             return _localInstance;
         }
     }
-    
+
     public BoardManager boardManager;
-    
+
     [SyncVar]
     public bool isWhitePlayer;
 
-    // Tracks how many player objects have spawned (server only) ──
+    // Static so all instances on the SERVER share the same counter
     private static int _connectedPlayers = 0;
+    private static bool _gameStarted = false;
 
     private void Start()
     {
         if (boardManager == null)
-        {
             boardManager = FindObjectOfType<BoardManager>();
-            if (boardManager == null)
-                Debug.LogError("BoardManager not found in scene!");
-        }
-        
+
         if (!isLocalPlayer) return;
-        
+
         _localInstance = this;
-        
+
         if (isServer)
         {
             isWhitePlayer = true;
@@ -58,29 +55,46 @@ public class ChessNetworkManager : NetworkBehaviour
         }
     }
 
-    // Fires on server when THIS player object is spawned ──
     public override void OnStartServer()
     {
         _connectedPlayers++;
         Debug.Log("Player spawned on server. Total: " + _connectedPlayers);
 
-        if (_connectedPlayers > 1)
+        if (_connectedPlayers >= 2 && !_gameStarted)
         {
-            // Both players are in — start the timer on everyone
-            RpcStartGame();
-            _connectedPlayers = 0; // reset for next game
+            _gameStarted = true;
+            _connectedPlayers = 0;
+            Debug.Log("Both players ready - starting game");
+            Invoke(nameof(DelayedStart), 0.5f); // kurze Verzögerung
         }
     }
 
-    // All clients start the timer simultaneously
+    private void DelayedStart()
+    {
+        RpcStartGame();
+    }
+
+    // Reset static state when server stops so next game starts clean
+    public override void OnStopServer()
+    {
+        _connectedPlayers = 0;
+        _gameStarted = false;
+    }
+
     [ClientRpc]
     public void RpcStartGame()
     {
+        Debug.Log("RpcStartGame received - setting up board and timer");
+
+        BoardManager board = FindObjectOfType<BoardManager>();
+        if (board != null)
+            board.SetupBoard();
+        else
+            Debug.LogError("BoardManager not found!");
+
         ChessTimer timer = FindObjectOfType<ChessTimer>();
         if (timer != null)
             timer.StartTimer();
-        else
-            Debug.Log("Timer not found");
     }
 
     private void OnDestroy()

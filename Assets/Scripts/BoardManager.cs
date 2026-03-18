@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
+using Mirror;
 
 public enum GameState
 {
@@ -11,10 +11,9 @@ public enum GameState
     Draw
 }
 
-
 public class BoardManager : MonoBehaviour
 {
-    public Transform[] squares; // 0-63, a1 to h8
+    public Transform[] squares;
     public GameState gameState = GameState.Playing;
 
     public GameObject whitePawn;
@@ -30,33 +29,41 @@ public class BoardManager : MonoBehaviour
     public GameObject blackBishop;
     public GameObject blackQueen;
     public GameObject blackKing;
-    
+
     public Piece[,] boardPieces = new Piece[8, 8];
-    public bool isWhiteTurn = true; // White starts
-    public Vector2Int enPassantTarget = new Vector2Int(-1, -1); // -1, -1 means no en passant available
-    
+    public bool isWhiteTurn = true;
+    public Vector2Int enPassantTarget = new Vector2Int(-1, -1);
+
     public Transform[] whiteCapturedSlots;
     public Transform[] blackCapturedSlots;
-    
+
     public int whiteCapturedCount = 0;
     public int blackCapturedCount = 0;
-    
+
     void Start()
     {
-        // Ensure squares are aligned to X-Z plane
+        // Align squares to board Y
         for (int i = 0; i < squares.Length; i++)
         {
             Vector3 pos = squares[i].position;
-            pos.y = transform.position.y; // Lock Y to board height
+            pos.y = transform.position.y;
             squares[i].position = pos;
         }
-        SetupBoard();
+
+        // Singleplayer only — multiplayer waits for RpcStartGame()
+        if (!NetworkClient.active && !NetworkServer.active)
+        {
+            Debug.Log("Singleplayer: setting up board immediately");
+            SetupBoard();
+        }
+        else
+        {
+            Debug.Log("Multiplayer: waiting for RpcStartGame to setup board");
+        }
     }
-    
-    //TEMPORÄR TEST FÜR FENConverter
+
     void Update()
     {
-        // Press F to print FEN (for testing)
         if (Input.GetKeyDown(KeyCode.F))
         {
             string fen = FENConverter.Instance.BoardToFEN();
@@ -64,57 +71,33 @@ public class BoardManager : MonoBehaviour
         }
     }
 
-    void SetupBoard()
+    public void SetupBoard()
     {
-        // White Pawns (row 1)
-        for (int i = 0; i < 8; i++)
-        {
-            int index = 8 + i; // 8-15
-            SetupPiece(whitePawn, true, PieceType.Pawn, index);
-        }
+        Debug.Log("SetupBoard called - NetworkServer.active: " + NetworkServer.active);
 
-        // Black Pawns (row 6)
-        for (int i = 0; i < 8; i++)
-        {
-            int index = 48 + i; // 48-55
-            SetupPiece(blackPawn, false, PieceType.Pawn, index);
-        }
+        for (int i = 0; i < 8; i++) SetupPiece(whitePawn,   true,  PieceType.Pawn,   8  + i);
+        for (int i = 0; i < 8; i++) SetupPiece(blackPawn,   false, PieceType.Pawn,   48 + i);
 
-        // White Rooks
-        SetupPiece(whiteRook, true, PieceType.Rook, 0); // a1
-        SetupPiece(whiteRook, true, PieceType.Rook, 7); // h1
+        SetupPiece(whiteRook,   true,  PieceType.Rook,   0);
+        SetupPiece(whiteRook,   true,  PieceType.Rook,   7);
+        SetupPiece(blackRook,   false, PieceType.Rook,   56);
+        SetupPiece(blackRook,   false, PieceType.Rook,   63);
 
-        // Black Rooks
-        SetupPiece(blackRook, false, PieceType.Rook, 56); // a8
-        SetupPiece(blackRook, false, PieceType.Rook, 63); // h8
+        SetupPiece(whiteKnight, true,  PieceType.Knight, 1);
+        SetupPiece(whiteKnight, true,  PieceType.Knight, 6);
+        SetupPiece(blackKnight, false, PieceType.Knight, 57);
+        SetupPiece(blackKnight, false, PieceType.Knight, 62);
 
-        // White Knights
-        SetupPiece(whiteKnight, true, PieceType.Knight, 1); // b1
-        SetupPiece(whiteKnight, true, PieceType.Knight, 6); // g1
+        SetupPiece(whiteBishop, true,  PieceType.Bishop, 2);
+        SetupPiece(whiteBishop, true,  PieceType.Bishop, 5);
+        SetupPiece(blackBishop, false, PieceType.Bishop, 58);
+        SetupPiece(blackBishop, false, PieceType.Bishop, 61);
 
-        // Black Knights
-        SetupPiece(blackKnight, false, PieceType.Knight, 57); // b8
-        SetupPiece(blackKnight, false, PieceType.Knight, 62); // g8
+        SetupPiece(whiteQueen,  true,  PieceType.Queen,  3);
+        SetupPiece(blackQueen,  false, PieceType.Queen,  59);
 
-        // White Bishops
-        SetupPiece(whiteBishop, true, PieceType.Bishop, 2); // c1
-        SetupPiece(whiteBishop, true, PieceType.Bishop, 5); // f1
-
-        // Black Bishops
-        SetupPiece(blackBishop, false, PieceType.Bishop, 58); // c8
-        SetupPiece(blackBishop, false, PieceType.Bishop, 61); // f8
-
-        // White Queen
-        SetupPiece(whiteQueen, true, PieceType.Queen, 3); // d1
-
-        // Black Queen
-        SetupPiece(blackQueen, false, PieceType.Queen, 59); // d8
-
-        // White King
-        SetupPiece(whiteKing, true, PieceType.King, 4); // e1
-
-        // Black King
-        SetupPiece(blackKing, false, PieceType.King, 60); // e8
+        SetupPiece(whiteKing,   true,  PieceType.King,   4);
+        SetupPiece(blackKing,   false, PieceType.King,   60);
     }
 
     private void SetupPiece(GameObject prefab, bool isWhitePiece, PieceType pieceType, int index)
@@ -124,62 +107,56 @@ public class BoardManager : MonoBehaviour
         Vector3 pos = squares[index].position;
         pos.y = prefab.transform.position.y;
 
-        GameObject pieceObj = Instantiate(prefab, pos, prefab.transform.rotation); // No parent specified
+        GameObject pieceObj = Instantiate(prefab, pos, prefab.transform.rotation);
         Piece piece = pieceObj.GetComponent<Piece>();
         if (piece != null)
         {
-            piece.isWhite = isWhitePiece;
-            piece.type = pieceType;
+            piece.isWhite  = isWhitePiece;
+            piece.type     = pieceType;
             piece.position = new Vector2Int(row, col);
             boardPieces[row, col] = piece;
         }
         else
         {
             Debug.LogError($"Piece component missing on {prefab.name}");
+            return;
         }
+
+        if (NetworkServer.active)
+            NetworkServer.Spawn(pieceObj);
     }
-    
+
     public void SendToSide(Piece capturedPiece)
     {
         if (capturedPiece == null) return;
 
-        // Choose slots based on the color of the piece that got captured
         Transform[] slots = capturedPiece.isWhite ? whiteCapturedSlots : blackCapturedSlots;
-
-        // Pick index and overflow behavior
         int idx = capturedPiece.isWhite ? whiteCapturedCount++ : blackCapturedCount++;
         Vector3 targetPos;
-        
-        // Keep the piece's original rotation
         Quaternion targetRot = capturedPiece.transform.rotation;
 
         if (slots != null && slots.Length > 0)
         {
-            // Clamp to last slot and start stacking with a tiny offset if we overflow
-            int clamped = Mathf.Clamp(idx, 0, slots.Length - 1);
-            float overflow = Mathf.Max(0, idx - (slots.Length - 1));
-            Vector3 stackOffset = new Vector3(0f, 0f, 0.18f * overflow); // gentle forward stack
-            targetPos = slots[clamped].position + stackOffset;
+            int clamped         = Mathf.Clamp(idx, 0, slots.Length - 1);
+            float overflow      = Mathf.Max(0, idx - (slots.Length - 1));
+            Vector3 stackOffset = new Vector3(0f, 0f, 0.18f * overflow);
+            targetPos           = slots[clamped].position + stackOffset;
         }
         else targetPos = transform.position + new Vector3(10f, 0f, 0f);
 
-        // Disable interaction on the captured piece
         var colls = capturedPiece.GetComponentsInChildren<Collider>(true);
         foreach (var c in colls) c.enabled = false;
         var rb = capturedPiece.GetComponent<Rigidbody>();
         if (rb) rb.isKinematic = true;
 
-        // Prevent its Piece script from participating in logic anymore
         capturedPiece.enabled = false;
 
-        // Parent to slot (keeps it tidy in hierarchy)
         if (slots != null && slots.Length > 0)
         {
             int clamped = Mathf.Clamp(idx, 0, slots.Length - 1);
             capturedPiece.transform.SetParent(slots[clamped], true);
         }
 
-        // Snap to target (keep board Y height)
         targetPos.y = transform.position.y;
         capturedPiece.transform.SetPositionAndRotation(targetPos, targetRot);
     }
@@ -187,9 +164,6 @@ public class BoardManager : MonoBehaviour
     public void HandleGameEnd(GameState result)
     {
         if (result == GameState.Playing) return;
-        
         gameState = result;
     }
-
-    
 }

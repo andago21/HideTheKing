@@ -182,14 +182,21 @@ public class BattleChessManager : NetworkBehaviour
         ctrl.PlaceAtPosition(position, lookAt);
         ctrl.SetBattleActive(true);
 
-        // Position-Callback: sendet Figur-Position per RPC an alle Clients
+        // Position-Callback: sendet Figur-Position an alle Clients
+        // Client schickt Command zum Server, Server sendet RPC
+        Piece myPiece = myFigure.GetComponent<Piece>();
         ctrl.onPositionChanged = (newPos) =>
         {
-            RpcSyncFigurePosition(
-                myFigure.GetComponent<Piece>().position.x,
-                myFigure.GetComponent<Piece>().position.y,
-                newPos.x, newPos.y, newPos.z
-            );
+            if (NetworkServer.active)
+            {
+                // Host: direkt RPC senden
+                RpcSyncFigurePosition(myPiece.position.x, myPiece.position.y, newPos.x, newPos.y, newPos.z);
+            }
+            else
+            {
+                // Client: Command zum Server schicken
+                CmdSyncFigurePosition(myPiece.position.x, myPiece.position.y, newPos.x, newPos.y, newPos.z);
+            }
         };
 
         // FPSWeapon hinzufügen
@@ -205,7 +212,13 @@ public class BattleChessManager : NetworkBehaviour
 
 
 
-    /// <summary>
+    [Command(requiresAuthority = false)]
+    private void CmdSyncFigurePosition(int row, int col, float x, float y, float z)
+    {
+        RpcSyncFigurePosition(row, col, x, y, z);
+    }
+
+        /// <summary>
     /// Synchronisiert die Figur-Position waehrend FPS-Kampf auf alle Clients.
     /// Wird aufgerufen wenn der lokale Spieler sich bewegt.
     /// </summary>
@@ -324,6 +337,9 @@ public class BattleChessManager : NetworkBehaviour
                 }
                 Debug.Log("[BattleChess] Defender won");
             }
+
+            // En Passant Target zuruecksetzen — Figur kam durch FPS, nicht durch Zwei-Felder-Zug
+            board.enPassantTarget = new Vector2Int(-1, -1);
 
             // Turn-Wechsel: nur der Host setzt isWhiteTurn
             // Der Angreifer hat den Zug gemacht — nach dem Kampf ist der Gegner dran

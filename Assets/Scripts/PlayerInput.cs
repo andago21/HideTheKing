@@ -180,6 +180,8 @@ public class PlayerInput : MonoBehaviour
 
             if (useBattleChess)
             {
+                // ── En Passant Target zuruecksetzen damit naechster Zug korrekt ist ──
+                boardManager.enPassantTarget = new Vector2Int(-1, -1);
                 BattleChessManager.Instance.RequestBattle(piece, targetPiece);
                 ClearSelection();
                 return true; // Battle gestartet — Turn-Wechsel kommt von RpcEndBattle

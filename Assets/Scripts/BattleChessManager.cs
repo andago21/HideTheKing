@@ -178,10 +178,19 @@ public class BattleChessManager : NetworkBehaviour
 
         // FPSController hinzufügen
         FPSController ctrl = body.AddComponent<FPSController>();
-        ctrl.figureToFollow = myFigure;
         ctrl.Initialize(cam, stats.moveSpeed, stats.mouseSensitivity);
         ctrl.PlaceAtPosition(position, lookAt);
         ctrl.SetBattleActive(true);
+
+        // Position-Callback: sendet Figur-Position per RPC an alle Clients
+        ctrl.onPositionChanged = (newPos) =>
+        {
+            RpcSyncFigurePosition(
+                myFigure.GetComponent<Piece>().position.x,
+                myFigure.GetComponent<Piece>().position.y,
+                newPos.x, newPos.y, newPos.z
+            );
+        };
 
         // FPSWeapon hinzufügen
         FPSWeapon weapon = body.AddComponent<FPSWeapon>();
@@ -194,6 +203,23 @@ public class BattleChessManager : NetworkBehaviour
         return body;
     }
 
+
+
+    /// <summary>
+    /// Synchronisiert die Figur-Position waehrend FPS-Kampf auf alle Clients.
+    /// Wird aufgerufen wenn der lokale Spieler sich bewegt.
+    /// </summary>
+    [ClientRpc]
+    private void RpcSyncFigurePosition(int row, int col, float x, float y, float z)
+    {
+        BoardManager board = FindObjectOfType<BoardManager>();
+        if (board == null) return;
+
+        Piece figure = board.boardPieces[row, col];
+        if (figure == null) return;
+
+        figure.transform.position = new Vector3(x, y, z);
+    }
 
     /// <summary>
     /// Wird lokal von FPSHealth aufgerufen — sendet Schaden zum Server.

@@ -26,6 +26,19 @@ public class VideoEndHandler : MonoBehaviour
     private Coroutine textFadeCoroutine;
     private Coroutine endSequenceCoroutine;
 
+    private void EnsureCanvasVisibleAtStartup()
+    {
+        if (canvasToDisable != null && !canvasToDisable.activeSelf)
+            canvasToDisable.SetActive(true);
+
+        if (canvasGroup == null)
+            return;
+
+        canvasGroup.alpha = 1f;
+        canvasGroup.interactable = true;
+        canvasGroup.blocksRaycasts = true;
+    }
+
     private void Awake()
     {
         if (videoPlayer == null)
@@ -33,6 +46,8 @@ public class VideoEndHandler : MonoBehaviour
 
         if (canvasGroup == null && canvasToDisable != null)
             canvasGroup = canvasToDisable.GetComponent<CanvasGroup>();
+
+        EnsureCanvasVisibleAtStartup();
 
         if (textCanvasGroup != null)
             textCanvasGroup.alpha = 0f;

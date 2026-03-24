@@ -44,6 +44,9 @@ public class PlayerInput : MonoBehaviour
             return;
         }
 
+        // Disable regular board input while tutorial mode is active.
+        if (TutorialManager.Instance != null && TutorialManager.Instance.TutorialActive) return;
+
         // Don't allow input if it's not your turn in multiplayer
         if (ChessNetworkManager.LocalInstance != null)
         {
@@ -327,7 +330,7 @@ public class PlayerInput : MonoBehaviour
         selectedPiece = null;
         ClearHighlights();
     }
-
+    
     private void ClearHighlights()
     {
         foreach (var h in highlights) Destroy(h);

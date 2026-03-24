@@ -26,6 +26,9 @@ public class TutorialPieceClickHandler : MonoBehaviour
 
         if (hitPiece && manager != null)
         {
+            // Block TutorialSquareRouter from also processing this same click
+            TutorialSquareRouter.ConsumeClick();
+
             var piece = GetComponent<Piece>();
             if (piece != null)
             {

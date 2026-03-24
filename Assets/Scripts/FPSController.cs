@@ -1,20 +1,21 @@
 using UnityEngine;
-using Mirror;
 
-/// <summary>
-/// FPS movement and camera control during battle.
-/// </summary>
-public class FPSController : NetworkBehaviour
+[RequireComponent(typeof(CharacterController))]
+public class FPSController : MonoBehaviour
 {
     [HideInInspector] public Camera fpsCamera;
-    [HideInInspector] public float moveSpeed        = 5f;
-    [HideInInspector] public float mouseSensitivity = 2f;
+    [HideInInspector] public float  moveSpeed        = 5f;
+    [HideInInspector] public float  mouseSensitivity = 2f;
+
+    // Callback: wird jeden Frame mit der neuen Position aufgerufen
+    // BattleChessManager setzt dies um die Position per RPC zu senden
+    public System.Action<Vector3> onPositionChanged;
 
     private CharacterController _cc;
-    private float _verticalRotation = 0f;
-    private bool  _battleActive     = false;
-    private float _verticalVelocity = 0f;
-    private const float Gravity     = -9.81f;
+    private float _verticalRotation   = 0f;
+    private float _horizontalRotation = 0f;
+    private bool  _battleActive       = false;
+    private float _startY;
 
     public void Initialize(Camera cam, float speed, float sensitivity)
     {
@@ -28,12 +29,12 @@ public class FPSController : NetworkBehaviour
     {
         _battleActive = active;
 
-        if (active && isLocalPlayer)
+        if (active)
         {
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible   = false;
         }
-        else if (!active)
+        else
         {
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible   = true;
@@ -42,27 +43,39 @@ public class FPSController : NetworkBehaviour
 
     private void Update()
     {
-        if (!isLocalPlayer) return;
-        if (!_battleActive)  return;
+        if (!_battleActive)    return;
+        if (fpsCamera == null) return;
 
+        Vector3 oldPos = transform.position;
         HandleMovement();
         HandleMouseLook();
+
+        // Wenn Position geaendert, Callback aufrufen fuer Netzwerk-Sync
+        if (transform.position != oldPos && onPositionChanged != null)
+            onPositionChanged(transform.position);
     }
 
     private void HandleMovement()
     {
-        float h    = Input.GetAxis("Horizontal");
-        float v    = Input.GetAxis("Vertical");
-        Vector3 move = transform.right * h + transform.forward * v;
-        move        *= moveSpeed;
+        if (_cc == null) return;
 
-        if (_cc != null && _cc.isGrounded)
-            _verticalVelocity = -1f;
-        else
-            _verticalVelocity += Gravity * Time.deltaTime;
+        float h = Input.GetAxis("Horizontal");
+        float v = Input.GetAxis("Vertical");
 
-        move.y = _verticalVelocity;
-        if (_cc != null) _cc.Move(move * Time.deltaTime);
+        Vector3 camForward = fpsCamera.transform.forward;
+        Vector3 camRight   = fpsCamera.transform.right;
+        camForward.y = 0f;
+        camRight.y   = 0f;
+        camForward.Normalize();
+        camRight.Normalize();
+
+        Vector3 move = (camForward * v + camRight * h) * moveSpeed * Time.deltaTime;
+
+        _cc.enabled = false;
+        Vector3 newPos = transform.position + move;
+        newPos.y = _startY;
+        transform.position = newPos;
+        _cc.enabled = true;
     }
 
     private void HandleMouseLook()
@@ -70,36 +83,44 @@ public class FPSController : NetworkBehaviour
         float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
         float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
 
-        transform.Rotate(0f, mouseX, 0f);
+        _horizontalRotation += mouseX;
+        _verticalRotation   -= mouseY;
+        _verticalRotation    = Mathf.Clamp(_verticalRotation, -80f, 80f);
 
-        _verticalRotation -= mouseY;
-        _verticalRotation  = Mathf.Clamp(_verticalRotation, -80f, 80f);
-
-        if (fpsCamera != null)
-        {
-            fpsCamera.transform.position = transform.position + Vector3.up * 1.5f;
-            fpsCamera.transform.rotation = transform.rotation *
-                                           Quaternion.Euler(_verticalRotation, 0f, 0f);
-        }
+        fpsCamera.transform.position = transform.position + Vector3.up * 1.5f;
+        fpsCamera.transform.rotation = Quaternion.Euler(_verticalRotation, _horizontalRotation, 0f);
     }
 
     public void PlaceAtPosition(Vector3 position, Vector3 lookAtTarget)
     {
-        if (_cc != null) _cc.enabled = false;
+        _startY = position.y;
+
+        if (_cc == null) _cc = GetComponent<CharacterController>();
+        _cc.enabled        = false;
         transform.position = position;
-        if (_cc != null) _cc.enabled = true;
+        _cc.enabled        = true;
 
         Vector3 dir = lookAtTarget - position;
         dir.y = 0;
         if (dir != Vector3.zero)
-            transform.rotation = Quaternion.LookRotation(dir);
+        {
+            transform.rotation  = Quaternion.LookRotation(dir);
+            _horizontalRotation = Quaternion.LookRotation(dir).eulerAngles.y;
+        }
 
         _verticalRotation = 0f;
 
         if (fpsCamera != null)
         {
             fpsCamera.transform.position = position + Vector3.up * 1.5f;
-            fpsCamera.transform.rotation = transform.rotation;
+            fpsCamera.transform.rotation = Quaternion.Euler(0f, _horizontalRotation, 0f);
         }
+    }
+
+    // Setzt die Figur-Position von aussen (empfangen vom anderen Client)
+    public void SetRemoteFigurePosition(Vector3 pos, Transform figure)
+    {
+        if (figure != null)
+            figure.position = pos;
     }
 }

@@ -1124,6 +1124,8 @@ MonoBehaviour:
   joinButton: {fileID: 1956500180}
   ipInputField: {fileID: 1863082235}
   waitingForPlayersText: {fileID: 504619670}
+  gameModeText: {fileID: 0}
+  errorText: {fileID: 0}
 --- !u!1 &1514917772
 GameObject:
   m_ObjectHideFlags: 0
@@ -1169,7 +1171,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6b0fecffa3f624585964b0d0eb21b18e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  port: 7777
+  port: 7778
   DualMode: 1
   NoDelay: 1
   Interval: 10

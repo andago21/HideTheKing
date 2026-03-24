@@ -1124,6 +1124,8 @@ MonoBehaviour:
   joinButton: {fileID: 1956500180}
   ipInputField: {fileID: 1863082235}
   waitingForPlayersText: {fileID: 504619670}
+  gameModeText: {fileID: 0}
+  errorText: {fileID: 0}
 --- !u!1 &1514917772
 GameObject:
   m_ObjectHideFlags: 0
@@ -1203,7 +1205,7 @@ MonoBehaviour:
   headlessStartMode: 0
   editorAutoStart: 0
   sendRate: 60
-  offlineScene: Assets/Scenes/Lobby.unity
+  offlineScene: 
   onlineScene: Assets/Scenes/ClassicGameMode.unity
   offlineSceneLoadDelay: 0
   transport: {fileID: 1514917774}

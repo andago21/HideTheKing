@@ -28929,7 +28929,7 @@ MonoBehaviour:
   playerInput: {fileID: 996436571}
   aiEnabled: 1
   aiPlaysBlack: 1
-  aiMoveDelay: 0
+  aiMoveDelay: 0.5
 --- !u!4 &1754926160
 Transform:
   m_ObjectHideFlags: 0

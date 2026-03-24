@@ -1,91 +1,75 @@
 using UnityEngine;
-using Mirror;
 
-/// <summary>
-/// Handles shooting for a player in FPS mode.
-/// Input is read client-side, but the actual raycast and damage run server-side.
-/// </summary>
-public class FPSWeapon : NetworkBehaviour
+public class FPSWeapon : MonoBehaviour
 {
-    [Header("References")]
-    public Camera fpsCamera;            // The FPS camera for this player
-    public GameObject muzzleFlashPrefab; // Optional visual effect, spawned client-side
-    public Transform muzzlePoint;        // Where the bullet comes from visually
+    [HideInInspector] public Camera fpsCamera;
 
-    // Stats come from FigureStats
-    private float damage;
-    private float fireRate;
-    private float bulletRange;
+    public float damage      = 20f;
+    public float fireRate    = 1f;
+    public float bulletRange = 50f;
+
+    public GameObject muzzleFlashPrefab;
+    public Transform  muzzlePoint;
 
     private float _nextFireTime = 0f;
     private bool  _battleActive = false;
 
-    public void Initialize(FigureStats stats, Camera cam)
-    {
-        damage      = stats.damage;
-        fireRate    = stats.fireRate;
-        bulletRange = stats.bulletRange;
-        fpsCamera   = cam;
-    }
+    // Layer Mask — nur Figuren treffen, nicht das Brett
+    // "Piece" Layer muss in Unity vorhanden sein und den Figuren zugewiesen werden
+    // Falls kein Piece-Layer existiert, wird alles getroffen (Fallback)
+    private int _pieceLayerMask = 0;
 
     public void SetBattleActive(bool active)
     {
         _battleActive = active;
+
+        // Layer Mask beim Aktivieren setzen
+        int pieceLayer = LayerMask.NameToLayer("Piece");
+        if (pieceLayer != -1)
+            _pieceLayerMask = LayerMask.GetMask("Piece");
+        else
+        {
+            // Kein Piece-Layer — alles ausser dem FPSBody treffen
+            _pieceLayerMask = ~LayerMask.GetMask("Ignore Raycast");
+            Debug.LogWarning("[FPSWeapon] Kein 'Piece' Layer gefunden. Erstelle ihn in Unity und weise ihn den Figur-Prefabs zu.");
+        }
     }
 
     private void Update()
     {
-        // Only the local player reads input
-        if (!isLocalPlayer) return;
-        if (!_battleActive)  return;
+        if (!_battleActive)    return;
+        if (fpsCamera == null) return;
 
         if (Input.GetButton("Fire1") && Time.time >= _nextFireTime)
         {
             _nextFireTime = Time.time + (1f / fireRate);
-            TryShoot();
+            Shoot();
         }
     }
 
-    private void TryShoot()
+    private void Shoot()
     {
-        // Play muzzle flash locally for responsiveness
         if (muzzleFlashPrefab != null && muzzlePoint != null)
             Instantiate(muzzleFlashPrefab, muzzlePoint.position, muzzlePoint.rotation);
 
-        // Send shoot command to server with ray direction
-        Vector3 origin    = fpsCamera.transform.position;
-        Vector3 direction = fpsCamera.transform.forward;
-        CmdShoot(origin, direction);
-    }
+        Ray ray = new Ray(fpsCamera.transform.position, fpsCamera.transform.forward);
+        Debug.DrawRay(ray.origin, ray.direction * bulletRange, Color.red, 0.5f);
 
-    /// <summary>
-    /// Runs on server — authoritative raycast and damage application.
-    /// </summary>
-    [Command]
-    private void CmdShoot(Vector3 origin, Vector3 direction)
-    {
-        Ray ray = new Ray(origin, direction);
-
-        Debug.DrawRay(origin, direction * bulletRange, Color.red, 1f);
-
-        if (Physics.Raycast(ray, out RaycastHit hit, bulletRange))
+        // Mit Layer Mask schiessen
+        if (Physics.Raycast(ray, out RaycastHit hit, bulletRange, _pieceLayerMask))
         {
+            Debug.Log($"[FPSWeapon] Raycast hit: {hit.collider.name}");
+
             FPSHealth health = hit.collider.GetComponentInParent<FPSHealth>();
             if (health != null)
             {
-                health.TakeDamage(damage);
-                Debug.Log($"[FPSWeapon] Hit {hit.collider.name} for {damage} damage");
-
-                // Tell all clients to show hit effect at impact point
-                RpcShowHitEffect(hit.point, hit.normal);
+                health.TakeDamageLocal(damage);
+                Debug.Log($"[FPSWeapon] Hit piece for {damage} damage");
+            }
+            else
+            {
+                Debug.Log($"[FPSWeapon] Hit {hit.collider.name} aber keine FPSHealth gefunden");
             }
         }
-    }
-
-    [ClientRpc]
-    private void RpcShowHitEffect(Vector3 point, Vector3 normal)
-    {
-        // TODO: spawn hit particle effect here when you have one
-        Debug.Log($"[FPSWeapon] Hit effect at {point}");
     }
 }

@@ -11,7 +11,7 @@ public enum GameState
     Draw
 }
 
-public class BoardManager : MonoBehaviour
+public class BoardManager : Mirror.NetworkBehaviour
 {
     public Transform[] squares;
     public GameState gameState = GameState.Playing;
@@ -31,7 +31,10 @@ public class BoardManager : MonoBehaviour
     public GameObject blackKing;
 
     public Piece[,] boardPieces = new Piece[8, 8];
+
+    [Mirror.SyncVar]
     public bool isWhiteTurn = true;
+
     public Vector2Int enPassantTarget = new Vector2Int(-1, -1);
 
     public Transform[] whiteCapturedSlots;

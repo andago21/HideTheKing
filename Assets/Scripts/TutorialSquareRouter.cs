@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+﻿﻿using UnityEngine;
 using UnityEngine.EventSystems;
 
 public class TutorialSquareRouter : MonoBehaviour, IPointerClickHandler
@@ -6,6 +6,9 @@ public class TutorialSquareRouter : MonoBehaviour, IPointerClickHandler
     public int index = -1;
 
     static int _lastClickFrame = -1;
+
+    /// <summary>Call this to consume the current click so this router won't forward it.</summary>
+    public static void ConsumeClick() { _lastClickFrame = Time.frameCount; }
 
     public void OnPointerClick(PointerEventData eventData)
     {

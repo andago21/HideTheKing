@@ -32,6 +32,9 @@ public class PlayerInput : MonoBehaviour
 
         if (TutorialManager.Instance != null && TutorialManager.Instance.TutorialActive) return;
 
+        // Keine Züge während HideTheKing Reveal
+        if (RevealManager.IsRevealing) return;
+
         if (ChessNetworkManager.LocalInstance != null)
             if (!ChessNetworkManager.LocalInstance.IsMyTurn()) return;
 

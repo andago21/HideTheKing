@@ -37,22 +37,22 @@ public class LobbyUI : MonoBehaviour
         "BattleChessGameModeWildWest"
     };
 
-    private static readonly string[] HIDE_THE_KING_SCENES = {
-        "HideTheKingCyberPunk",
-        "HideTheKingMedivalBattle",
-        "HideTheKingPirates",
-        "HideTheKingSpaceOdyseey",
-        "HideTheKingTimeTravel",
-        "HideTheKingWildWest"
+     private static readonly string[] HIDE_THE_KING_SCENES = {
+        "HideTheKingGameModeCyberPunk"
+        // "HideTheKingGameModeMedivalBattle",
+        // "HideTheKingGameModePirates",
+        // "HideTheKingGameModeSpaceOdyseey",
+        // "HideTheKingGameModeTimeTravel",
+        // "HideTheKingGameModeWildWest"
     };
-
+ 
     private static readonly string[] CROWN_CONFUSION_SCENES = {
-        "CrownOfConfusionCyberPunk",
-        "CrownOfConfusionMedivalBattle",
-        "CrownOfConfusionPirates",
-        "CrownOfConfusionSpaceOdyseey",
-        "CrownOfConfusionTimeTravel",
-        "CrownOfConfusionWildWest"
+        "CrownOfConfussionsGameModeCyberPunk",
+        "CrownOfConfussionsGameModeMedivalBattle",
+        "CrownOfConfussionsGameModePirates",
+        "CrownOfConfussionsGameModeSpaceOdyseey",
+        "CrownOfConfussionsGameModeTimeTravel",
+        "CrownOfConfussionsGameModeWildWest"
     };
 
     private ushort   _currentPort;

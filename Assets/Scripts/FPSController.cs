@@ -4,11 +4,10 @@ using UnityEngine;
 public class FPSController : MonoBehaviour
 {
     [HideInInspector] public Camera fpsCamera;
-    [HideInInspector] public float  moveSpeed        = 5f;
-    [HideInInspector] public float  mouseSensitivity = 2f;
+    [HideInInspector] public float  moveSpeed           = 5f;
+    [HideInInspector] public float  mouseSensitivity    = 2f;
+    [HideInInspector] public float  cameraHeightOffset  = 0.3f; // Camera height above figure base
 
-    // Callback: wird jeden Frame mit der neuen Position aufgerufen
-    // BattleChessManager setzt dies um die Position per RPC zu senden
     public System.Action<Vector3> onPositionChanged;
 
     private CharacterController _cc;
@@ -50,7 +49,6 @@ public class FPSController : MonoBehaviour
         HandleMovement();
         HandleMouseLook();
 
-        // Wenn Position geaendert, Callback aufrufen fuer Netzwerk-Sync
         if (transform.position != oldPos && onPositionChanged != null)
             onPositionChanged(transform.position);
     }
@@ -73,7 +71,7 @@ public class FPSController : MonoBehaviour
 
         _cc.enabled = false;
         Vector3 newPos = transform.position + move;
-        newPos.y = _startY;
+        newPos.y = _startY; // Keep Y fixed at board height
         transform.position = newPos;
         _cc.enabled = true;
     }
@@ -87,13 +85,14 @@ public class FPSController : MonoBehaviour
         _verticalRotation   -= mouseY;
         _verticalRotation    = Mathf.Clamp(_verticalRotation, -80f, 80f);
 
-        fpsCamera.transform.position = transform.position + Vector3.up * 1.5f;
+        // Camera positioned at figure head height
+        fpsCamera.transform.position = transform.position + Vector3.up * cameraHeightOffset;
         fpsCamera.transform.rotation = Quaternion.Euler(_verticalRotation, _horizontalRotation, 0f);
     }
 
     public void PlaceAtPosition(Vector3 position, Vector3 lookAtTarget)
     {
-        _startY = position.y;
+        _startY = position.y; // Board height — Y is always fixed here
 
         if (_cc == null) _cc = GetComponent<CharacterController>();
         _cc.enabled        = false;
@@ -112,12 +111,11 @@ public class FPSController : MonoBehaviour
 
         if (fpsCamera != null)
         {
-            fpsCamera.transform.position = position + Vector3.up * 1.5f;
+            fpsCamera.transform.position = position + Vector3.up * cameraHeightOffset;
             fpsCamera.transform.rotation = Quaternion.Euler(0f, _horizontalRotation, 0f);
         }
     }
 
-    // Setzt die Figur-Position von aussen (empfangen vom anderen Client)
     public void SetRemoteFigurePosition(Vector3 pos, Transform figure)
     {
         if (figure != null)

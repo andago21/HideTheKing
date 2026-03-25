@@ -174,16 +174,12 @@ public class BattleChessManager : NetworkBehaviour
         cc.radius = 0.2f;
         cc.center = new Vector3(0, 0.25f, 0);
 
-        // Kamera direkt auf Figur-Kopf positionieren
-        // Figur-Höhe schätzen (Figur-Bounds oder feste Höhe)
-        float headHeight = GetFigureHeadHeight(myFigure);
-        Vector3 headPos  = position;
-        headPos.y        = myFigure.position.y + headHeight;
-
-        body.transform.position = headPos;
+        // FPSBody auf Brett-Höhe positionieren (nicht Kopfhöhe)
+        // Kamera wird separat auf Kopfhöhe gesetzt in PlaceAtPosition
+        body.transform.position = position;
 
         // Richtung zum Gegner
-        Vector3 dir = lookAt - headPos;
+        Vector3 dir = lookAt - position;
         dir.y = 0;
         if (dir != Vector3.zero)
             body.transform.rotation = Quaternion.LookRotation(dir);
@@ -211,9 +207,11 @@ public class BattleChessManager : NetworkBehaviour
         }
 
         // FPSController hinzufügen
+        float headHeight = GetFigureHeadHeight(myFigure);
         FPSController ctrl = body.AddComponent<FPSController>();
         ctrl.Initialize(cam, stats.moveSpeed, stats.mouseSensitivity);
-        ctrl.PlaceAtPosition(headPos, lookAt);
+        ctrl.cameraHeightOffset = headHeight;
+        ctrl.PlaceAtPosition(position, lookAt);
         ctrl.SetBattleActive(true);
 
         // Position-Callback

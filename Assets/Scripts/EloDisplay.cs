@@ -27,6 +27,6 @@ public class EloDisplay : MonoBehaviour
         int    losses = EloManager.Instance.GetLosses();
         int    draws  = EloManager.Instance.GetDraws();
 
-        eloText.text = $"Rang: {rank}\nELO: {elo}\nW: {wins}  L: {losses}  D: {draws}";
+        eloText.text = $"Rank: {rank}\nELO: {elo}\nW: {wins}  L: {losses}  D: {draws}";
     }
 }

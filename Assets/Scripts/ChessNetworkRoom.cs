@@ -6,21 +6,17 @@ public class ChessNetworkRoom : NetworkManager
 {
     public override void OnServerDisconnect(NetworkConnectionToClient conn)
     {
-        Debug.Log("[Disconnect] OnServerDisconnect gefeuert!");
+        Debug.Log("[Disconnect] OnServerDisconnect fired!");
 
         BoardManager board = FindObjectOfType<BoardManager>();
         if (board != null && board.gameState == GameState.Playing)
         {
-            // Client hat getrennt — Host (Weiß) gewinnt
+            // Client disconnected — Host (White) wins
             board.HandleGameEnd(GameState.WhiteWins);
 
-            // ELO für Host
             if (SceneManager.GetActiveScene().name.Contains("Classic"))
                 if (EloManager.Instance != null)
                     EloManager.Instance.UpdateElo(1f, 1200);
-
-            // Alle Clients informieren — aber Client ist bereits weg
-            // Der verbleibende Host sieht den Screen durch HandleGameEnd
         }
 
         base.OnServerDisconnect(conn);
@@ -28,12 +24,12 @@ public class ChessNetworkRoom : NetworkManager
 
     public override void OnClientDisconnect()
     {
-        Debug.Log("[Disconnect] OnClientDisconnect gefeuert!");
+        Debug.Log("[Disconnect] OnClientDisconnect fired!");
 
         BoardManager board = FindObjectOfType<BoardManager>();
         if (board != null && board.gameState == GameState.Playing)
         {
-            // Host hat getrennt — Client (Schwarz) gewinnt
+            // Server disconnected — Client (Black) wins
             board.HandleGameEnd(GameState.BlackWins);
 
             if (SceneManager.GetActiveScene().name.Contains("Classic"))

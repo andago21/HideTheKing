@@ -5,12 +5,7 @@ using UnityEngine;
 
 namespace HideTheKing.Core
 {
-    public enum PieceSide
-    {
-        None,
-        Left,
-        Right
-    }
+    public enum PieceSide { None, Left, Right }
 
     public sealed class HiddenTargetLogicGeneric
     {
@@ -19,13 +14,10 @@ namespace HideTheKing.Core
         private Piece _hiddenTarget;
         private bool _hiddenIsWhite;
 
-        public void Initialize(
-            IReadOnlyList<Piece> pieces,
-            bool? hiddenIsWhite = null,
-            int? randomSeed = null)
+        // Original: zufällige Auswahl (für Host)
+        public void Initialize(IReadOnlyList<Piece> pieces, bool? hiddenIsWhite = null, int? randomSeed = null)
         {
-            if (pieces == null)
-                throw new ArgumentNullException(nameof(pieces));
+            if (pieces == null) throw new ArgumentNullException(nameof(pieces));
 
             _rng = randomSeed.HasValue ? new System.Random(randomSeed.Value) : new System.Random();
             _hiddenIsWhite = hiddenIsWhite ?? (_rng.Next(2) == 0);
@@ -37,10 +29,17 @@ namespace HideTheKing.Core
                 .ToList();
 
             if (pool.Count == 0)
-                throw new InvalidOperationException(
-                    "Hide The King Role not detected: No valid pieces available for selection.");
+                throw new InvalidOperationException("No valid pieces available for selection.");
 
             _hiddenTarget = pool[_rng.Next(pool.Count)];
+        }
+
+        // Neu: direkte Zuweisung (für Client — bekommt Auswahl vom Host)
+        public void InitializeWithPiece(Piece piece, bool hiddenIsWhite)
+        {
+            if (piece == null) throw new ArgumentNullException(nameof(piece));
+            _hiddenTarget  = piece;
+            _hiddenIsWhite = hiddenIsWhite;
         }
 
         public bool ReportCapture(Piece captured, bool capturingIsWhite)
@@ -50,7 +49,6 @@ namespace HideTheKing.Core
                 OnGameOver?.Invoke(capturingIsWhite, "Hidden Target Captured!");
                 return true;
             }
-
             return false;
         }
 
@@ -58,7 +56,7 @@ namespace HideTheKing.Core
         {
             return new HiddenTargetStateGeneric
             {
-                HiddenTarget = _hiddenTarget,
+                HiddenTarget  = _hiddenTarget,
                 HiddenIsWhite = _hiddenIsWhite
             };
         }
@@ -66,32 +64,27 @@ namespace HideTheKing.Core
         public static PieceSide GetSide(Piece piece)
         {
             if (piece == null) return PieceSide.None;
-
             if (piece.type != PieceType.Rook &&
                 piece.type != PieceType.Bishop &&
                 piece.type != PieceType.Knight)
                 return PieceSide.None;
-
-            // position.y is the column (0 = file a, 7 = file h)
-            int col = piece.position.y;
-            return col <= 3 ? PieceSide.Left : PieceSide.Right;
+            return piece.position.y <= 3 ? PieceSide.Left : PieceSide.Right;
         }
 
         public static string GetSideName(Piece piece)
         {
-            var side = GetSide(piece);
-            switch (side)
+            switch (GetSide(piece))
             {
-                case PieceSide.Left: return "Left";
+                case PieceSide.Left:  return "Left";
                 case PieceSide.Right: return "Right";
-                default: return "Center";
+                default:              return "Center";
             }
         }
     }
 
     public sealed class HiddenTargetStateGeneric
     {
-        public Piece HiddenTarget { get; set; }
-        public bool HiddenIsWhite { get; set; }
+        public Piece HiddenTarget  { get; set; }
+        public bool  HiddenIsWhite { get; set; }
     }
 }

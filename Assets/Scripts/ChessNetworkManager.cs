@@ -30,9 +30,8 @@ public class ChessNetworkManager : NetworkBehaviour
     [SyncVar]
     public bool isWhitePlayer;
 
-    // Static so all instances on the SERVER share the same counter
-    private static int _connectedPlayers = 0;
-    private static bool _gameStarted = false;
+    private static int  _connectedPlayers = 0;
+    private static bool _gameStarted      = false;
 
     private void Start()
     {
@@ -62,10 +61,10 @@ public class ChessNetworkManager : NetworkBehaviour
 
         if (_connectedPlayers >= 2 && !_gameStarted)
         {
-            _gameStarted = true;
+            _gameStarted      = true;
             _connectedPlayers = 0;
             Debug.Log("Both players ready - starting game");
-            Invoke(nameof(DelayedStart), 0.5f); // kurze Verzögerung
+            Invoke(nameof(DelayedStart), 0.5f);
         }
     }
 
@@ -74,11 +73,10 @@ public class ChessNetworkManager : NetworkBehaviour
         RpcStartGame();
     }
 
-    // Reset static state when server stops so next game starts clean
     public override void OnStopServer()
     {
         _connectedPlayers = 0;
-        _gameStarted = false;
+        _gameStarted      = false;
     }
 
     [ClientRpc]
@@ -103,6 +101,7 @@ public class ChessNetworkManager : NetworkBehaviour
             _localInstance = null;
     }
 
+    // ── Züge ──
     public void SendMove(Vector2Int from, Vector2Int to)
     {
         if (!NetworkClient.active && !NetworkServer.active) return;
@@ -122,16 +121,14 @@ public class ChessNetworkManager : NetworkBehaviour
     [ClientRpc]
     private void RpcReceiveMove(int fromX, int fromY, int toX, int toY)
     {
-        Vector2Int from = new Vector2Int(fromX, fromY);
-        Vector2Int to   = new Vector2Int(toX,   toY);
-
         if (isLocalPlayer) return;
 
         PlayerInput playerInput = FindObjectOfType<PlayerInput>();
         if (playerInput != null)
-            playerInput.ExecuteNetworkMove(from, to);
+            playerInput.ExecuteNetworkMove(new Vector2Int(fromX, fromY), new Vector2Int(toX, toY));
     }
 
+    // ── Spielende ──
     public void SendGameEnd(GameState result)
     {
         if (!NetworkClient.active && !NetworkServer.active) return;
@@ -154,6 +151,67 @@ public class ChessNetworkManager : NetworkBehaviour
         Debug.Log("RpcReceiveGameEnd: " + (GameState)result);
         if (boardManager != null)
             boardManager.HandleGameEnd((GameState)result);
+    }
+
+    // ── ELO Synchronisation ──
+    // Wird nach Spielende aufgerufen — Host sendet seine ELO zum Client
+    // Beide berechnen dann ihre eigene ELO lokal
+    public void SendEloSync(GameState result)
+    {
+        if (!IsMultiplayer())       return;
+        if (EloManager.Instance == null) return;
+
+        int myElo = EloManager.Instance.GetElo();
+
+        if (isServer)
+            RpcReceiveEloSync(myElo, (int)result);
+        else
+            CmdSendEloSync(myElo, (int)result);
+    }
+
+    [Command(requiresAuthority = false)]
+    private void CmdSendEloSync(int clientElo, int result)
+    {
+        // Server (Host) empfängt Client-ELO und sendet seine eigene ELO zurück
+        // Jetzt weiß der Host die ELO des Clients
+        int hostElo = EloManager.Instance != null ? EloManager.Instance.GetElo() : 1200;
+        RpcReceiveEloSync(hostElo, result);
+
+        // Host berechnet seine eigene ELO mit der Client-ELO
+        if (EloManager.Instance != null)
+        {
+            float hostResult = GetResultForWhite((GameState)result, true);
+            EloManager.Instance.UpdateElo(hostResult, clientElo);
+        }
+    }
+
+    [ClientRpc]
+    private void RpcReceiveEloSync(int opponentElo, int result)
+    {
+        if (EloManager.Instance == null) return;
+
+        // Jeder Spieler berechnet sein eigenes Ergebnis
+        float myResult = isWhitePlayer
+            ? GetResultForWhite((GameState)result, true)
+            : GetResultForWhite((GameState)result, false);
+
+        // Nur lokaler Spieler speichert
+        if (isLocalPlayer)
+            EloManager.Instance.UpdateElo(myResult, opponentElo);
+    }
+
+    // Gibt 1 (Gewinn), 0 (Verlust), 0.5 (Unentschieden) zurück
+    private float GetResultForWhite(GameState state, bool forWhite)
+    {
+        switch (state)
+        {
+            case GameState.WhiteWins:
+                return forWhite ? 1f : 0f;
+            case GameState.BlackWins:
+                return forWhite ? 0f : 1f;
+            default: // Draw, Stalemate, etc.
+                return 0.5f;
+        }
     }
 
     public bool IsMyTurn()

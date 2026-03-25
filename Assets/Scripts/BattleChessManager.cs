@@ -29,6 +29,13 @@ public class BattleChessManager : NetworkBehaviour
 
     public void RequestBattle(Piece attacker, Piece defender)
     {
+        // König niemals im FPS — normale Capture-Logik stattdessen
+        if (attacker.type == PieceType.King || defender.type == PieceType.King)
+        {
+            Debug.Log("[BattleChess] König ist beteiligt — kein FPS Battle");
+            return;
+        }
+
         if (!isServer)
         {
             CmdRequestBattle(
@@ -158,56 +165,104 @@ public class BattleChessManager : NetworkBehaviour
     private GameObject CreateFPSBody(Vector3 position, Vector3 lookAt, Camera cam, FigureStats stats, Transform myFigure)
     {
         // Unsichtbarer Körper
-        GameObject body    = new GameObject("FPSBody_Local");
-        body.layer         = LayerMask.NameToLayer("Default");
+        GameObject body = new GameObject("FPSBody_Local");
+        body.layer      = LayerMask.NameToLayer("Default");
 
-        // CharacterController
+        // CharacterController — klein weil Figur klein ist
         CharacterController cc = body.AddComponent<CharacterController>();
-        cc.height = 1.8f;
-        cc.radius = 0.3f;
-        cc.center = new Vector3(0, 0.9f, 0);
+        cc.height = 0.5f;
+        cc.radius = 0.2f;
+        cc.center = new Vector3(0, 0.25f, 0);
 
-        // Position setzen
-        body.transform.position = position;
+        // Kamera direkt auf Figur-Kopf positionieren
+        // Figur-Höhe schätzen (Figur-Bounds oder feste Höhe)
+        float headHeight = GetFigureHeadHeight(myFigure);
+        Vector3 headPos  = position;
+        headPos.y        = myFigure.position.y + headHeight;
+
+        body.transform.position = headPos;
 
         // Richtung zum Gegner
-        Vector3 dir = lookAt - position;
+        Vector3 dir = lookAt - headPos;
         dir.y = 0;
         if (dir != Vector3.zero)
             body.transform.rotation = Quaternion.LookRotation(dir);
 
+        // WeaponHolder — Child des FPSBody, für lokale FPS-Ansicht
+        GameObject weaponHolder = new GameObject("WeaponHolder");
+        weaponHolder.transform.SetParent(body.transform);
+        weaponHolder.transform.localPosition = new Vector3(0.3f, -0.2f, 0.5f);
+        weaponHolder.transform.localRotation = Quaternion.identity;
+
+        // FigureWeaponHolder — auf der Figur, für anderen Spieler sichtbar
+        Transform figureWeaponHolder = myFigure.Find("FigureWeaponHolder");
+        if (figureWeaponHolder != null)
+        {
+            // Weapon-Prefab auf Figur spawnen (für anderen Spieler)
+            ThemeWeaponRegistry registry = ThemeWeaponRegistry.Instance;
+            if (registry != null && registry.weaponPrefabFigure != null)
+            {
+                GameObject figWeapon = Instantiate(registry.weaponPrefabFigure, figureWeaponHolder);
+                figWeapon.transform.localPosition = Vector3.zero;
+                figWeapon.transform.localRotation = Quaternion.identity;
+                figWeapon.SetActive(true);
+                // Beim FPS Ende wird es mit der Figur-Cleanup entfernt
+            }
+        }
+
         // FPSController hinzufügen
         FPSController ctrl = body.AddComponent<FPSController>();
         ctrl.Initialize(cam, stats.moveSpeed, stats.mouseSensitivity);
-        ctrl.PlaceAtPosition(position, lookAt);
+        ctrl.PlaceAtPosition(headPos, lookAt);
         ctrl.SetBattleActive(true);
 
-        // Position-Callback: sendet Figur-Position an alle Clients
-        // Client schickt Command zum Server, Server sendet RPC
+        // Position-Callback
         Piece myPiece = myFigure.GetComponent<Piece>();
         ctrl.onPositionChanged = (newPos) =>
         {
             if (NetworkServer.active)
-            {
-                // Host: direkt RPC senden
                 RpcSyncFigurePosition(myPiece.position.x, myPiece.position.y, newPos.x, newPos.y, newPos.z);
-            }
             else
-            {
-                // Client: Command zum Server schicken
                 CmdSyncFigurePosition(myPiece.position.x, myPiece.position.y, newPos.x, newPos.y, newPos.z);
-            }
         };
 
         // FPSWeapon hinzufügen
         FPSWeapon weapon = body.AddComponent<FPSWeapon>();
-        weapon.fpsCamera = cam;
+        weapon.fpsCamera   = cam;
         weapon.damage      = stats.damage;
         weapon.fireRate    = stats.fireRate;
         weapon.bulletRange = stats.bulletRange;
+        weapon.weaponType  = stats.weaponType;
+        weapon.weaponHolder = weaponHolder.transform;
+
+        // Weapon-Prefab für FPS-Ansicht spawnen
+        ThemeWeaponRegistry reg = ThemeWeaponRegistry.Instance;
+        if (reg != null && reg.weaponPrefabFPS != null)
+        {
+            GameObject fpsWeaponObj = Instantiate(reg.weaponPrefabFPS, weaponHolder.transform);
+            fpsWeaponObj.transform.localPosition = Vector3.zero;
+            fpsWeaponObj.transform.localRotation = Quaternion.identity;
+        }
+
         weapon.SetBattleActive(true);
 
         return body;
+    }
+
+    /// <summary>
+    /// Schätzt die Kopfhöhe der Figur basierend auf ihrem Renderer.
+    /// </summary>
+    private float GetFigureHeadHeight(Transform figure)
+    {
+        Renderer[] renderers = figure.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0) return 0.3f;
+
+        Bounds bounds = renderers[0].bounds;
+        foreach (var r in renderers)
+            bounds.Encapsulate(r.bounds);
+
+        // Kopf = obere Hälfte der Figur
+        return bounds.size.y * 0.85f;
     }
 
 

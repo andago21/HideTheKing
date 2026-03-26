@@ -29,12 +29,14 @@ public class LobbyUI : MonoBehaviour
     };
 
     private static readonly string[] BATTLE_SCENES = {
-        "BattleChessGameModeCyberPunk",
+        "BattleChessGameModeCyberPunk"
+        /*
         "BattleChessGameModeMedivalBattle",
         "BattleChessGameModePirates",
         "BattleChessGameModeSpaceOdyseey",
         "BattleChessGameModeTimeTravel",
         "BattleChessGameModeWildWest"
+        */
     };
 
      private static readonly string[] HIDE_THE_KING_SCENES = {
@@ -47,12 +49,12 @@ public class LobbyUI : MonoBehaviour
     };
  
     private static readonly string[] CROWN_CONFUSION_SCENES = {
-        "CrownOfConfussionsGameModeCyberPunk"
-        // "CrownOfConfussionsGameModeMedivalBattle",
-        // "CrownOfConfussionsGameModePirates",
-        // "CrownOfConfussionsGameModeSpaceOdyseey",
-        // "CrownOfConfussionsGameModeTimeTravel",
-        // "CrownOfConfussionsGameModeWildWest"
+        "CrownOfConfussionsGameModeCyberPunk",
+        "CrownOfConfussionsGameModeMedivalBattle",
+        "CrownOfConfussionsGameModePirates",
+        "CrownOfConfussionsGameModeSpaceOdyseey",
+        "CrownOfConfussionsGameModeTimeTravel",
+        "CrownOfConfussionsGameModeWildWest"
     };
 
     private ushort   _currentPort;

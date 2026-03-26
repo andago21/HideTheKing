@@ -38,21 +38,21 @@ public class LobbyUI : MonoBehaviour
     };
 
      private static readonly string[] HIDE_THE_KING_SCENES = {
-        "HideTheKingGameModeCyberPunk"
-        // "HideTheKingGameModeMedivalBattle",
-        // "HideTheKingGameModePirates",
-        // "HideTheKingGameModeSpaceOdyseey",
-        // "HideTheKingGameModeTimeTravel",
-        // "HideTheKingGameModeWildWest"
+        "HideTheKingGameModeCyberPunk",
+        "HideTheKingGameModeMedivalBattle",
+        "HideTheKingGameModePirates",
+        "HideTheKingGameModeSpaceOdyseey",
+        "HideTheKingGameModeTimeTravel",
+        "HideTheKingGameModeWildWest"
     };
  
     private static readonly string[] CROWN_CONFUSION_SCENES = {
-        "CrownOfConfussionsGameModeCyberPunk",
-        "CrownOfConfussionsGameModeMedivalBattle",
-        "CrownOfConfussionsGameModePirates",
-        "CrownOfConfussionsGameModeSpaceOdyseey",
-        "CrownOfConfussionsGameModeTimeTravel",
-        "CrownOfConfussionsGameModeWildWest"
+        "CrownOfConfussionsGameModeCyberPunk"
+        // "CrownOfConfussionsGameModeMedivalBattle",
+        // "CrownOfConfussionsGameModePirates",
+        // "CrownOfConfussionsGameModeSpaceOdyseey",
+        // "CrownOfConfussionsGameModeTimeTravel",
+        // "CrownOfConfussionsGameModeWildWest"
     };
 
     private ushort   _currentPort;
@@ -75,7 +75,7 @@ public class LobbyUI : MonoBehaviour
             _currentModeName = "Hide The King";
             _scenePool       = HIDE_THE_KING_SCENES;
         }
-        else if (sceneName.Contains("CrownOfConfusion"))
+        else if (sceneName.Contains("CrownOfConfussions"))
         {
             _currentPort     = PORT_CROWN_CONFUSION;
             _currentModeName = "Crown Of Confusion";

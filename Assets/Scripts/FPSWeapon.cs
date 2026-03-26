@@ -2,45 +2,63 @@ using UnityEngine;
 
 public class FPSWeapon : MonoBehaviour
 {
-    [HideInInspector] public Camera fpsCamera;
+    [HideInInspector] public Camera    fpsCamera;
+    [HideInInspector] public WeaponType weaponType = WeaponType.Gun;
 
     public float damage      = 20f;
     public float fireRate    = 1f;
     public float bulletRange = 50f;
 
-    // Weapon visuals
-    [HideInInspector] public WeaponType weaponType = WeaponType.Gun;
-    [HideInInspector] public Transform  weaponHolder; // child of FPSBody
-
-    // Particle systems
+    // Optional particles
     public ParticleSystem muzzleFlashParticle;
     public ParticleSystem swingTrailParticle;
 
-    private float _nextFireTime = 0f;
-    private bool  _battleActive = false;
+    private float   _nextFireTime  = 0f;
+    private bool    _battleActive  = false;
 
-    // Animation state
-    private bool  _isAnimating     = false;
-    private float _animTimer       = 0f;
-    private const float ANIM_DURATION = 0.25f;
+    // Weapon model — direct child of camera
+    private Transform _weaponModel = null;
 
-    // Sword swing: rotate around Z axis
-    private Quaternion _weaponStartRot;
-    private Quaternion _weaponEndRot;
-
-    // Gun kickback: move backward then return
-    private Vector3 _weaponStartPos;
-    private Vector3 _weaponKickbackPos;
+    // Animation
+    private bool      _isAnimating   = false;
+    private float     _animTimer     = 0f;
+    private const float ANIM_DURATION = 0.2f;
+    private Vector3   _modelBasePos;
+    private Vector3   _modelKickPos;
+    private Quaternion _modelBaseRot;
+    private Quaternion _modelSwingRot;
 
     public void SetBattleActive(bool active)
     {
         _battleActive = active;
     }
 
+    /// <summary>
+    /// Call this after FPS camera is set up to attach weapon to camera.
+    /// </summary>
+    public void AttachWeaponToCamera(GameObject weaponPrefab)
+    {
+        if (fpsCamera == null || weaponPrefab == null) return;
+
+        // Instantiate directly under camera
+        GameObject obj = Instantiate(weaponPrefab, fpsCamera.transform);
+        obj.transform.localPosition = new Vector3(0.25f, -0.2f, 0.4f);
+        obj.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
+        obj.transform.localScale    = weaponPrefab.transform.localScale;
+        _weaponModel = obj.transform;
+
+        // Save base pose for animation
+        _modelBasePos  = obj.transform.localPosition;
+        _modelBaseRot  = obj.transform.localRotation;
+        _modelKickPos  = _modelBasePos + new Vector3(0f, 0f, -0.15f);
+        _modelSwingRot = _modelBaseRot * Quaternion.Euler(-70f, 0f, 0f);
+
+        Debug.Log("[FPSWeapon] Weapon attached to camera");
+    }
+
     private void Update()
     {
-        if (!_battleActive)    return;
-        if (fpsCamera == null) return;
+        if (!_battleActive || fpsCamera == null) return;
 
         HandleAnimation();
 
@@ -53,52 +71,37 @@ public class FPSWeapon : MonoBehaviour
 
     private void Attack()
     {
-        StartWeaponAnimation();
+        StartAnimation();
 
         if (weaponType == WeaponType.Gun)
         {
             Shoot();
-            if (muzzleFlashParticle != null)
-                muzzleFlashParticle.Play();
+            if (muzzleFlashParticle != null) muzzleFlashParticle.Play();
         }
         else
         {
             Swing();
-            if (swingTrailParticle != null)
-                swingTrailParticle.Play();
+            if (swingTrailParticle != null) swingTrailParticle.Play();
         }
     }
 
-    // ── Gun: Raycast schießen ──
     private void Shoot()
     {
         Ray ray = new Ray(fpsCamera.transform.position, fpsCamera.transform.forward);
-        Debug.DrawRay(ray.origin, ray.direction * bulletRange, Color.red, 0.5f);
-
-        int layerMask = ~LayerMask.GetMask("Ignore Raycast");
-        if (Physics.Raycast(ray, out RaycastHit hit, bulletRange, layerMask))
+        if (Physics.Raycast(ray, out RaycastHit hit, bulletRange))
         {
-            Debug.Log($"[FPSWeapon] Raycast hit: {hit.collider.name}");
             FPSHealth health = hit.collider.GetComponentInParent<FPSHealth>();
             if (health != null)
             {
                 health.TakeDamageLocal(damage);
-                Debug.Log($"[FPSWeapon] Hit piece for {damage} damage");
-            }
-            else
-            {
-                Debug.Log($"[FPSWeapon] Hit {hit.collider.name} aber keine FPSHealth gefunden");
+                Debug.Log($"[FPSWeapon] Hit {hit.collider.name} for {damage}");
             }
         }
     }
 
-    // ── Sword: Melee-Treffer prüfen ──
     private void Swing()
     {
-        // Sphere cast vor der Kamera für Nahkampf
         Vector3 origin = fpsCamera.transform.position;
-        float   meleeRange = 3f;
-
         Collider[] hits = Physics.OverlapSphere(origin + fpsCamera.transform.forward * 1.5f, 1f);
         foreach (var col in hits)
         {
@@ -107,65 +110,56 @@ public class FPSWeapon : MonoBehaviour
             {
                 health.TakeDamageLocal(damage);
                 Debug.Log($"[FPSWeapon] Sword hit {col.name} for {damage}");
-                break; // nur einmal pro Swing
+                break;
             }
         }
     }
 
-    // ── Animationen ──
-    private void StartWeaponAnimation()
+    private void StartAnimation()
     {
-        if (weaponHolder == null) return;
-
+        if (_weaponModel == null) return;
         _isAnimating = true;
         _animTimer   = 0f;
-
-        if (weaponType == WeaponType.Gun)
-        {
-            // Kickback: Waffe bewegt sich kurz rückwärts
-            _weaponStartPos    = weaponHolder.localPosition;
-            _weaponKickbackPos = _weaponStartPos + Vector3.back * 0.15f;
-        }
-        else
-        {
-            // Swing: Waffe dreht sich nach vorne
-            _weaponStartRot = weaponHolder.localRotation;
-            _weaponEndRot   = _weaponStartRot * Quaternion.Euler(-70f, 0f, 0f);
-        }
     }
 
     private void HandleAnimation()
     {
-        if (!_isAnimating || weaponHolder == null) return;
+        if (!_isAnimating || _weaponModel == null) return;
 
         _animTimer += Time.deltaTime;
-        float t = _animTimer / ANIM_DURATION;
+        float t = Mathf.Clamp01(_animTimer / ANIM_DURATION);
 
         if (weaponType == WeaponType.Gun)
         {
-            // Kickback: hin und zurück
+            // Kickback in camera-local space — always backward from camera
             if (t <= 0.5f)
-                weaponHolder.localPosition = Vector3.Lerp(_weaponStartPos, _weaponKickbackPos, t * 2f);
+                _weaponModel.localPosition = Vector3.Lerp(_modelBasePos, _modelKickPos, t * 2f);
             else
-                weaponHolder.localPosition = Vector3.Lerp(_weaponKickbackPos, _weaponStartPos, (t - 0.5f) * 2f);
+                _weaponModel.localPosition = Vector3.Lerp(_modelKickPos, _modelBasePos, (t - 0.5f) * 2f);
         }
         else
         {
-            // Swing: vor und zurück
+            // Swing rotation in camera-local space
             if (t <= 0.5f)
-                weaponHolder.localRotation = Quaternion.Lerp(_weaponStartRot, _weaponEndRot, t * 2f);
+                _weaponModel.localRotation = Quaternion.Lerp(_modelBaseRot, _modelSwingRot, t * 2f);
             else
-                weaponHolder.localRotation = Quaternion.Lerp(_weaponEndRot, _weaponStartRot, (t - 0.5f) * 2f);
+                _weaponModel.localRotation = Quaternion.Lerp(_modelSwingRot, _modelBaseRot, (t - 0.5f) * 2f);
         }
 
         if (t >= 1f)
         {
-            _isAnimating = false;
-            // Reset
-            if (weaponType == WeaponType.Gun)
-                weaponHolder.localPosition = _weaponStartPos;
-            else
-                weaponHolder.localRotation = _weaponStartRot;
+            _isAnimating               = false;
+            _weaponModel.localPosition = _modelBasePos;
+            _weaponModel.localRotation = _modelBaseRot;
+        }
+    }
+
+    public void DestroyWeaponModel()
+    {
+        if (_weaponModel != null)
+        {
+            Destroy(_weaponModel.gameObject);
+            _weaponModel = null;
         }
     }
 }

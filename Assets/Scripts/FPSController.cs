@@ -40,6 +40,9 @@ public class FPSController : MonoBehaviour
         }
     }
 
+    public System.Action<float> onRotationChanged;
+    private float _lastSentRotY = -999f;
+
     private void Update()
     {
         if (!_battleActive)    return;
@@ -51,6 +54,15 @@ public class FPSController : MonoBehaviour
 
         if (transform.position != oldPos && onPositionChanged != null)
             onPositionChanged(transform.position);
+
+        // Send rotation when changed
+        float currentRotY = fpsCamera.transform.eulerAngles.y;
+        if (Mathf.Abs(Mathf.DeltaAngle(currentRotY, _lastSentRotY)) > 1f)
+        {
+            _lastSentRotY = currentRotY;
+            if (onRotationChanged != null)
+                onRotationChanged(currentRotY);
+        }
     }
 
     private void HandleMovement()

@@ -1,25 +1,21 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
- 
 
 public class ThemeWeaponRegistry : MonoBehaviour
 {
     public static ThemeWeaponRegistry Instance;
- 
-    [Header("FPS Weapon Prefab (lokale Ansicht)")]
+
+    [Header("Weapon Prefab (used for FPS view)")]
     public GameObject weaponPrefabFPS;
- 
-    [Header("Figure Weapon Prefab (sichtbar fuer anderen Spieler)")]
-    public GameObject weaponPrefabFigure;
- 
-    [Header("Weapon Type")]
+
+    public GameObject weaponPrefabFigure => weaponPrefabFPS;
+
+    [Header("Weapon Type (auto-detected from scene name)")]
     public WeaponType weaponType;
- 
+
     private void Awake()
     {
-        Instance = this;
-        // Auto-detect weapon type from scene name
+        Instance   = this;
         weaponType = FigureStats.GetWeaponTypeForScene(SceneManager.GetActiveScene().name);
     }
 }
- 

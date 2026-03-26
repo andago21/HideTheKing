@@ -18,8 +18,9 @@ public class BattleChessManager : NetworkBehaviour
     private Piece _defender;
     private bool  _battleActive = false;
 
-    private List<GameObject> _hiddenObjects   = new List<GameObject>();
-    private GameObject       _localFPSBody    = null; // unsichtbarer FPS-Koerper
+    private List<GameObject> _hiddenObjects      = new List<GameObject>();
+    private GameObject       _localFPSBody        = null;
+    private GameObject       _spawnedFigureWeapon = null;
 
     private void Awake()
     {
@@ -184,27 +185,10 @@ public class BattleChessManager : NetworkBehaviour
         if (dir != Vector3.zero)
             body.transform.rotation = Quaternion.LookRotation(dir);
 
-        // WeaponHolder — Child des FPSBody, für lokale FPS-Ansicht
-        GameObject weaponHolder = new GameObject("WeaponHolder");
-        weaponHolder.transform.SetParent(body.transform);
-        weaponHolder.transform.localPosition = new Vector3(0.3f, -0.2f, 0.5f);
-        weaponHolder.transform.localRotation = Quaternion.identity;
+        // No WeaponHolder needed — weapon attaches directly to camera
 
-        // FigureWeaponHolder — auf der Figur, für anderen Spieler sichtbar
-        Transform figureWeaponHolder = myFigure.Find("FigureWeaponHolder");
-        if (figureWeaponHolder != null)
-        {
-            // Weapon-Prefab auf Figur spawnen (für anderen Spieler)
-            ThemeWeaponRegistry registry = ThemeWeaponRegistry.Instance;
-            if (registry != null && registry.weaponPrefabFigure != null)
-            {
-                GameObject figWeapon = Instantiate(registry.weaponPrefabFigure, figureWeaponHolder);
-                figWeapon.transform.localPosition = Vector3.zero;
-                figWeapon.transform.localRotation = Quaternion.identity;
-                figWeapon.SetActive(true);
-                // Beim FPS Ende wird es mit der Figur-Cleanup entfernt
-            }
-        }
+        // Reduce near clip plane to avoid clipping through figures
+        cam.nearClipPlane = 0.1f;
 
         // FPSController hinzufügen
         float headHeight = GetFigureHeadHeight(myFigure);
@@ -214,7 +198,7 @@ public class BattleChessManager : NetworkBehaviour
         ctrl.PlaceAtPosition(position, lookAt);
         ctrl.SetBattleActive(true);
 
-        // Position-Callback
+        // Position Callback
         Piece myPiece = myFigure.GetComponent<Piece>();
         ctrl.onPositionChanged = (newPos) =>
         {
@@ -224,27 +208,77 @@ public class BattleChessManager : NetworkBehaviour
                 CmdSyncFigurePosition(myPiece.position.x, myPiece.position.y, newPos.x, newPos.y, newPos.z);
         };
 
-        // FPSWeapon hinzufügen
-        FPSWeapon weapon = body.AddComponent<FPSWeapon>();
+        // Rotation Callback
+        ctrl.onRotationChanged = (rotY) =>
+        {
+            if (NetworkServer.active)
+                RpcSyncFigureRotation(myPiece.position.x, myPiece.position.y, rotY);
+            else
+                CmdSyncFigureRotation(myPiece.position.x, myPiece.position.y, rotY);
+        };
+
+        // FPSWeapon — weapon attaches directly to camera
+        FPSWeapon weapon   = body.AddComponent<FPSWeapon>();
         weapon.fpsCamera   = cam;
         weapon.damage      = stats.damage;
         weapon.fireRate    = stats.fireRate;
         weapon.bulletRange = stats.bulletRange;
         weapon.weaponType  = stats.weaponType;
-        weapon.weaponHolder = weaponHolder.transform;
 
-        // Weapon-Prefab für FPS-Ansicht spawnen
         ThemeWeaponRegistry reg = ThemeWeaponRegistry.Instance;
         if (reg != null && reg.weaponPrefabFPS != null)
-        {
-            GameObject fpsWeaponObj = Instantiate(reg.weaponPrefabFPS, weaponHolder.transform);
-            fpsWeaponObj.transform.localPosition = Vector3.zero;
-            fpsWeaponObj.transform.localRotation = Quaternion.identity;
-        }
+            weapon.AttachWeaponToCamera(reg.weaponPrefabFPS);
 
         weapon.SetBattleActive(true);
 
+        // Tell other player to show weapon on enemy figure
+        Piece myPieceRef = myFigure.GetComponent<Piece>();
+        if (NetworkServer.active)
+            RpcShowEnemyWeapon(myPieceRef.position.x, myPieceRef.position.y);
+        else
+            CmdShowEnemyWeapon(myPieceRef.position.x, myPieceRef.position.y);
+
         return body;
+    }
+
+    [Command(requiresAuthority = false)]
+    private void CmdShowEnemyWeapon(int row, int col)
+    {
+        RpcShowEnemyWeapon(row, col);
+    }
+
+    [ClientRpc]
+    private void RpcShowEnemyWeapon(int row, int col)
+    {
+        // Only show on the OTHER player's screen
+        ChessNetworkManager localMgr = ChessNetworkManager.LocalInstance;
+        if (localMgr == null) return;
+
+        BoardManager board = FindObjectOfType<BoardManager>();
+        if (board == null) return;
+
+        Piece figure = board.boardPieces[row, col];
+        if (figure == null) return;
+
+        // Skip if this is MY figure — I already have weapon in hand
+        bool localIsWhite = localMgr.isWhitePlayer;
+        if (figure.isWhite == localIsWhite) return;
+
+        // Show weapon on enemy figure
+        Transform holder = figure.transform.Find("FigureWeaponHolder");
+        ThemeWeaponRegistry reg = ThemeWeaponRegistry.Instance;
+        if (holder == null || reg == null || reg.weaponPrefabFPS == null) return;
+
+        // Remove existing weapons first
+        foreach (Transform child in holder)
+            Destroy(child.gameObject);
+
+        GameObject enemyWeapon = Instantiate(reg.weaponPrefabFPS, holder);
+        enemyWeapon.transform.localPosition = Vector3.zero;
+        enemyWeapon.transform.localRotation = Quaternion.Euler(-90f, 180f, 0f); // stand upright, rotated 180 on Y
+        enemyWeapon.transform.localScale    = Vector3.one * 0.05f;
+        enemyWeapon.SetActive(true);
+        _spawnedFigureWeapon = enemyWeapon;
     }
 
     /// <summary>
@@ -264,6 +298,32 @@ public class BattleChessManager : NetworkBehaviour
     }
 
 
+
+
+
+    [Command(requiresAuthority = false)]
+    private void CmdSyncFigureRotation(int row, int col, float rotY)
+    {
+        RpcSyncFigureRotation(row, col, rotY);
+    }
+
+    [ClientRpc]
+    private void RpcSyncFigureRotation(int row, int col, float rotY)
+    {
+        BoardManager board = FindObjectOfType<BoardManager>();
+        if (board == null) return;
+
+        Piece figure = board.boardPieces[row, col];
+        if (figure == null) return;
+
+        ChessNetworkManager localMgr = ChessNetworkManager.LocalInstance;
+        if (localMgr == null) return;
+        if (figure.isWhite == localMgr.isWhitePlayer) return;
+
+        Vector3 euler = figure.transform.eulerAngles;
+        euler.y = rotY;
+        figure.transform.eulerAngles = euler;
+    }
 
     [Command(requiresAuthority = false)]
     private void CmdSyncFigurePosition(int row, int col, float x, float y, float z)
@@ -331,11 +391,20 @@ public class BattleChessManager : NetworkBehaviour
         Piece attacker = board.boardPieces[ax, ay];
         Piece defender = board.boardPieces[dx, dy];
 
-        // 1. FPS-Körper zerstören
+        // 1. FPS-Körper und Waffe zerstören
         if (_localFPSBody != null)
         {
+            FPSWeapon w = _localFPSBody.GetComponent<FPSWeapon>();
+            if (w != null) w.DestroyWeaponModel();
             Destroy(_localFPSBody);
             _localFPSBody = null;
+        }
+
+// Cleanup enemy weapon visible on figure
+        if (_spawnedFigureWeapon != null)
+        {
+            Destroy(_spawnedFigureWeapon);
+            _spawnedFigureWeapon = null;
         }
 
         // 2. Health-Komponenten entfernen
@@ -348,7 +417,13 @@ public class BattleChessManager : NetworkBehaviour
 
         // 4. Kamera wiederherstellen
         ChessCameraController camCtrl = FindObjectOfType<ChessCameraController>();
-        if (camCtrl != null) camCtrl.RestoreFromFPS();
+        if (camCtrl != null)
+        {
+            camCtrl.RestoreFromFPS();
+            // Restore default near clip plane
+            Camera mainCam = camCtrl.GetMainCamera();
+            if (mainCam != null) mainCam.nearClipPlane = 0.1f;
+        }
 
         // 5. Schachbrett-Ergebnis anwenden
         if (board != null)

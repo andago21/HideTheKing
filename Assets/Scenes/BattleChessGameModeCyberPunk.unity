@@ -13232,7 +13232,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &689533236
 RectTransform:
   m_ObjectHideFlags: 0
@@ -15217,8 +15217,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7e3c4765324fd574db8d6ada06154845, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  weaponPrefabFPS: {fileID: 0}
-  weaponPrefabFigure: {fileID: 0}
+  weaponPrefabFPS: {fileID: 5821662392931380413, guid: 4bf4725a09976dd4ab52c475ee15cd8f, type: 3}
   weaponType: 1
 --- !u!1 &1013884387
 GameObject:
@@ -28854,7 +28853,7 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.01
+  near clip plane: 0.03
   far clip plane: 1000
   field of view: 60.5
   orthographic: 0
@@ -35038,6 +35037,7 @@ MonoBehaviour:
   - {fileID: 5246754002956934924, guid: d210ddf29295fb844acf4f1cb7dd369c, type: 3}
   - {fileID: 7768081178613237500, guid: 9886809fb13704143a286e631214a87b, type: 3}
   - {fileID: 2590073585237835122, guid: 499d432a93667a742bddf6ec1b9a3303, type: 3}
+  - {fileID: 5821662392931380413, guid: 4bf4725a09976dd4ab52c475ee15cd8f, type: 3}
   exceptionsDisconnect: 1
   snapshotSettings:
     bufferTimeMultiplier: 2

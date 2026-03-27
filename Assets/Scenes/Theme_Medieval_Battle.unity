@@ -11559,7 +11559,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &264961777
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14343,7 +14343,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: VICTORY!
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: d0fbd3f5cf107d74ab681d4cf82336dc, type: 2}
+  m_fontAsset: {fileID: 0}
   m_sharedMaterial: {fileID: 7277075528710576988, guid: d0fbd3f5cf107d74ab681d4cf82336dc, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -17584,6 +17584,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e80f79c514e997b46b95766823568c07, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   squares:
   - {fileID: 39424207}
   - {fileID: 966746952}
@@ -18170,7 +18173,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: 'Black Pieces Captured: 0'
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: d0fbd3f5cf107d74ab681d4cf82336dc, type: 2}
+  m_fontAsset: {fileID: 0}
   m_sharedMaterial: {fileID: 7277075528710576988, guid: d0fbd3f5cf107d74ab681d4cf82336dc, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -23539,7 +23542,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: 'White Pieces Captured: 0'
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: d0fbd3f5cf107d74ab681d4cf82336dc, type: 2}
+  m_fontAsset: {fileID: 0}
   m_sharedMaterial: {fileID: 7277075528710576988, guid: d0fbd3f5cf107d74ab681d4cf82336dc, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -36364,7 +36367,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: '>'
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8a89fa14b10d46a99122fd4f73fca9a2, type: 2}
+  m_fontAsset: {fileID: 0}
   m_sharedMaterial: {fileID: 2140474, guid: 8a89fa14b10d46a99122fd4f73fca9a2, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
@@ -42260,7 +42263,7 @@ MonoBehaviour:
       m_Calls: []
   m_text: 
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: dc36b3fdc14f47ebb36fd484a67e268a, type: 2}
+  m_fontAsset: {fileID: 0}
   m_sharedMaterial: {fileID: 2140032, guid: dc36b3fdc14f47ebb36fd484a67e268a, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}

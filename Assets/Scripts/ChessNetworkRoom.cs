@@ -24,6 +24,13 @@ public class ChessNetworkRoom : NetworkManager
 
     public override void OnClientDisconnect()
     {
+        // Skip if we are the host — OnServerDisconnect already handled it
+        if (NetworkServer.active)
+        {
+            base.OnClientDisconnect();
+            return;
+        }
+
         Debug.Log("[Disconnect] OnClientDisconnect fired!");
 
         BoardManager board = FindObjectOfType<BoardManager>();

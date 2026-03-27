@@ -29,14 +29,14 @@ public class LobbyUI : MonoBehaviour
     };
 
     private static readonly string[] BATTLE_SCENES = {
-        "BattleChessGameModeCyberPunk"
-        /*
+        //"BattleChessGameModeCyberPunk",
         "BattleChessGameModeMedivalBattle",
+        /*
         "BattleChessGameModePirates",
         "BattleChessGameModeSpaceOdyseey",
         "BattleChessGameModeTimeTravel",
-        "BattleChessGameModeWildWest"
         */
+        "BattleChessGameModeWildWest"
     };
 
      private static readonly string[] HIDE_THE_KING_SCENES = {

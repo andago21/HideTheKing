@@ -268,7 +268,10 @@ public class PlayerInput : MonoBehaviour
         if (ChessNetworkManager.LocalInstance != null && ChessNetworkManager.LocalInstance.IsMultiplayer())
         {
             if (boardManager.gameState != GameState.Playing)
+            {
                 ChessNetworkManager.LocalInstance.SendGameEnd(boardManager.gameState);
+                ChessNetworkManager.LocalInstance.SendEloSync(boardManager.gameState);
+            }
         }
 
         return false;

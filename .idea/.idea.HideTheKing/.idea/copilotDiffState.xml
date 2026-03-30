@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CopilotDiffPersistence">
+    <option name="pendingDiffs">
+      <map>
+        <entry key="$PROJECT_DIR$/Assets/Scripts/ArrowSelector.cs">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="$PROJECT_DIR$/Assets/Scripts/ArrowSelector.cs" />
+              <option name="originalContent" value="using UnityEngine;&#10;using UnityEngine.EventSystems;&#10;using UnityEngine.UIElements;&#10;&#10;public class ArrowSelector : MonoBehaviour, IPointerEnterHandler&#10;{&#10;    public RectTransform arrow;&#10;    public float targetY;&#10;&#10;    public void OnPointerEnter(PointerEventData eventData)&#10;    {&#10;        if (arrow != null)&#10;        {&#10;            Vector3 pos = arrow.localPosition;&#10;            pos.y = targetY;&#10;            arrow.localPosition = pos;&#10;        }&#10;    }&#10;&#10;&#10;}" />
+              <option name="updatedContent" value="using System.Collections.Generic;&#10;using UnityEngine;&#10;using UnityEngine.EventSystems;&#10;&#10;public class ArrowSelector : MonoBehaviour&#10;{&#10;    public RectTransform arrow;&#10;    public List&lt;RectTransform&gt; buttons;&#10;&#10;    private Canvas _canvas;&#10;&#10;    void Start()&#10;    {&#10;        _canvas = GetComponentInParent&lt;Canvas&gt;();&#10;&#10;        foreach (var button in buttons)&#10;        {&#10;            var trigger = button.GetComponent&lt;EventTrigger&gt;() ?? button.gameObject.AddComponent&lt;EventTrigger&gt;();&#10;            var bt = button;&#10;&#10;            var entry = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };&#10;            entry.callback.AddListener(_ =&gt; SnapToButton(bt));&#10;            trigger.triggers.Add(entry);&#10;        }&#10;    }&#10;&#10;    void SnapToButton(RectTransform button)&#10;    {&#10;        if (arrow == null || _canvas == null) return;&#10;&#10;        Camera cam = _canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : Camera.main;&#10;&#10;        Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(cam, button.position);&#10;&#10;        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(&#10;                arrow.parent as RectTransform,&#10;                screenPoint,&#10;                cam,&#10;                out Vector2 localPoint))&#10;        {&#10;            arrow.localPosition = new Vector3(arrow.localPosition.x, localPoint.y, arrow.localPosition.z);&#10;        }&#10;    }&#10;}" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>

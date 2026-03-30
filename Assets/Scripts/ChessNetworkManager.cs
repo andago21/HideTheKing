@@ -27,11 +27,12 @@ public class ChessNetworkManager : NetworkBehaviour
 
     public BoardManager boardManager;
 
-    [SyncVar]
-    public bool isWhitePlayer;
+    [SyncVar] public bool isWhitePlayer;
+    public static bool LocalIsWhite = false;
 
     private static int  _connectedPlayers = 0;
     private static bool _gameStarted      = false;
+    private static bool _eloGiven         = false; // Verhindert doppeltes ELO
 
     private void Start()
     {
@@ -41,177 +42,125 @@ public class ChessNetworkManager : NetworkBehaviour
         if (!isLocalPlayer) return;
 
         _localInstance = this;
+        _eloGiven      = false;
 
-        if (isServer)
-        {
-            isWhitePlayer = true;
-            Debug.Log("You are the HOST - Playing as WHITE");
-        }
-        else if (isClient)
-        {
-            isWhitePlayer = false;
-            Debug.Log("You are the CLIENT - Playing as BLACK");
-        }
+        if (isServer)      { isWhitePlayer = true;  Debug.Log("You are the HOST - Playing as WHITE"); }
+        else if (isClient) { isWhitePlayer = false; Debug.Log("You are the CLIENT - Playing as BLACK"); }
+
+        LocalIsWhite = isWhitePlayer;
     }
 
     public override void OnStartServer()
     {
         _connectedPlayers++;
-        Debug.Log("Player spawned on server. Total: " + _connectedPlayers);
+        Debug.Log($"[CNM] OnStartServer fired. Total={_connectedPlayers}");
 
         if (_connectedPlayers >= 2 && !_gameStarted)
         {
             _gameStarted      = true;
             _connectedPlayers = 0;
-            Debug.Log("Both players ready - starting game");
+            _eloGiven         = false;
             Invoke(nameof(DelayedStart), 0.5f);
         }
     }
 
-    private void DelayedStart()
-    {
-        RpcStartGame();
-    }
+    private void DelayedStart() { RpcStartGame(); }
 
     public override void OnStopServer()
     {
         _connectedPlayers = 0;
         _gameStarted      = false;
+        _eloGiven         = false;
     }
 
     [ClientRpc]
     public void RpcStartGame()
     {
-        Debug.Log("RpcStartGame received - setting up board and timer");
-
         BoardManager board = FindObjectOfType<BoardManager>();
-        if (board != null)
-            board.SetupBoard();
-        else
-            Debug.LogError("BoardManager not found!");
-
+        if (board != null) board.SetupBoard();
         ChessTimer timer = FindObjectOfType<ChessTimer>();
-        if (timer != null)
-            timer.StartTimer();
+        if (timer != null) timer.StartTimer();
+
+        if (MusicManager.Instance != null)
+            MusicManager.Instance.StartThemeMusic();
     }
 
     private void OnDestroy()
     {
-        if (_localInstance == this)
-            _localInstance = null;
+        if (_localInstance == this) _localInstance = null;
     }
 
     // ── Züge ──
     public void SendMove(Vector2Int from, Vector2Int to)
     {
         if (!NetworkClient.active && !NetworkServer.active) return;
-
-        if (isServer)
-            RpcReceiveMove(from.x, from.y, to.x, to.y);
-        else
-            CmdSendMove(from.x, from.y, to.x, to.y);
+        if (isServer) RpcReceiveMove(from.x, from.y, to.x, to.y);
+        else          CmdSendMove(from.x, from.y, to.x, to.y);
     }
 
     [Command(requiresAuthority = false)]
-    private void CmdSendMove(int fromX, int fromY, int toX, int toY)
-    {
-        RpcReceiveMove(fromX, fromY, toX, toY);
-    }
+    private void CmdSendMove(int fx, int fy, int tx, int ty) { RpcReceiveMove(fx, fy, tx, ty); }
 
     [ClientRpc]
-    private void RpcReceiveMove(int fromX, int fromY, int toX, int toY)
+    private void RpcReceiveMove(int fx, int fy, int tx, int ty)
     {
         if (isLocalPlayer) return;
-
-        PlayerInput playerInput = FindObjectOfType<PlayerInput>();
-        if (playerInput != null)
-            playerInput.ExecuteNetworkMove(new Vector2Int(fromX, fromY), new Vector2Int(toX, toY));
+        PlayerInput pi = FindObjectOfType<PlayerInput>();
+        if (pi != null) pi.ExecuteNetworkMove(new Vector2Int(fx, fy), new Vector2Int(tx, ty));
     }
 
     // ── Spielende ──
     public void SendGameEnd(GameState result)
     {
         if (!NetworkClient.active && !NetworkServer.active) return;
-
-        if (isServer)
-            RpcReceiveGameEnd((int)result);
-        else
-            CmdSendGameEnd((int)result);
+        if (isServer) RpcReceiveGameEnd((int)result);
+        else          CmdSendGameEnd((int)result);
     }
 
     [Command(requiresAuthority = false)]
-    private void CmdSendGameEnd(int result)
-    {
-        RpcReceiveGameEnd(result);
-    }
+    private void CmdSendGameEnd(int result) { RpcReceiveGameEnd(result); }
 
     [ClientRpc]
     private void RpcReceiveGameEnd(int result)
     {
-        Debug.Log("RpcReceiveGameEnd: " + (GameState)result);
-        if (boardManager != null)
-            boardManager.HandleGameEnd((GameState)result);
+        if (boardManager != null) boardManager.HandleGameEnd((GameState)result);
     }
 
-    // ── ELO Synchronisation ──
-    // Wird nach Spielende aufgerufen — Host sendet seine ELO zum Client
-    // Beide berechnen dann ihre eigene ELO lokal
+    // ── ELO Sync ──
     public void SendEloSync(GameState result)
     {
-        if (!IsMultiplayer())       return;
-        if (EloManager.Instance == null) return;
+        if (!IsMultiplayer()) return;
+        if (_eloGiven)        return; // Verhindert doppeltes ELO
 
-        int myElo = EloManager.Instance.GetElo();
-
-        if (isServer)
-            RpcReceiveEloSync(myElo, (int)result);
-        else
-            CmdSendEloSync(myElo, (int)result);
+        if (isServer) CmdDoEloSync((int)result);
+        else          CmdDoEloSync((int)result);
     }
 
     [Command(requiresAuthority = false)]
-    private void CmdSendEloSync(int clientElo, int result)
+    private void CmdDoEloSync(int result)
     {
-        // Server (Host) empfängt Client-ELO und sendet seine eigene ELO zurück
-        // Jetzt weiß der Host die ELO des Clients
-        int hostElo = EloManager.Instance != null ? EloManager.Instance.GetElo() : 1200;
-        RpcReceiveEloSync(hostElo, result);
+        if (_eloGiven) return;
+        _eloGiven = true;
 
-        // Host berechnet seine eigene ELO mit der Client-ELO
-        if (EloManager.Instance != null)
-        {
-            float hostResult = GetResultForWhite((GameState)result, true);
-            EloManager.Instance.UpdateElo(hostResult, clientElo);
-        }
+        if (!UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Contains("Classic")) return;
+
+        // Beide Spieler berechnen ELO lokal via RPC — kein Server-only
+        float whiteResult = result == (int)GameState.WhiteWins ? 1f : (result == (int)GameState.BlackWins ? 0f : 0.5f);
+        float blackResult = 1f - whiteResult;
+        if (result == (int)GameState.Draw) blackResult = 0.5f;
+
+        RpcDoEloLocally(whiteResult, blackResult);
     }
 
     [ClientRpc]
-    private void RpcReceiveEloSync(int opponentElo, int result)
+    private void RpcDoEloLocally(float whiteResult, float blackResult)
     {
+        if (!isLocalPlayer) return;
         if (EloManager.Instance == null) return;
 
-        // Jeder Spieler berechnet sein eigenes Ergebnis
-        float myResult = isWhitePlayer
-            ? GetResultForWhite((GameState)result, true)
-            : GetResultForWhite((GameState)result, false);
-
-        // Nur lokaler Spieler speichert
-        if (isLocalPlayer)
-            EloManager.Instance.UpdateElo(myResult, opponentElo);
-    }
-
-    // Gibt 1 (Gewinn), 0 (Verlust), 0.5 (Unentschieden) zurück
-    private float GetResultForWhite(GameState state, bool forWhite)
-    {
-        switch (state)
-        {
-            case GameState.WhiteWins:
-                return forWhite ? 1f : 0f;
-            case GameState.BlackWins:
-                return forWhite ? 0f : 1f;
-            default: // Draw, Stalemate, etc.
-                return 0.5f;
-        }
+        float myResult = isWhitePlayer ? whiteResult : blackResult;
+        EloManager.Instance.UpdateElo(myResult, 1200);
+        Debug.Log($"[ELO] Local result={myResult} isWhite={isWhitePlayer}");
     }
 
     public bool IsMyTurn()

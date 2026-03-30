@@ -5,6 +5,8 @@ public class FPSWeapon : MonoBehaviour
     [HideInInspector] public Camera    fpsCamera;
     [HideInInspector] public WeaponType weaponType = WeaponType.Gun;
 
+
+
     public float damage      = 20f;
     public float fireRate    = 1f;
     public float bulletRange = 50f;
@@ -42,8 +44,9 @@ public class FPSWeapon : MonoBehaviour
 
         // Instantiate directly under camera
         GameObject obj = Instantiate(weaponPrefab, fpsCamera.transform);
-        obj.transform.localPosition = new Vector3(0.25f, -0.2f, 0.4f);
-        obj.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
+        ThemeWeaponRegistry r = ThemeWeaponRegistry.Instance;
+        obj.transform.localPosition = r != null ? r.ownWeaponPosition : new Vector3(0.25f, -0.2f, 0.4f);
+        obj.transform.localRotation = Quaternion.Euler(r != null ? r.ownWeaponRotation : Vector3.zero);
         obj.transform.localScale    = weaponPrefab.transform.localScale;
         _weaponModel = obj.transform;
 
@@ -51,7 +54,7 @@ public class FPSWeapon : MonoBehaviour
         _modelBasePos  = obj.transform.localPosition;
         _modelBaseRot  = obj.transform.localRotation;
         _modelKickPos  = _modelBasePos + new Vector3(0f, 0f, -0.15f);
-        _modelSwingRot = _modelBaseRot * Quaternion.Euler(-70f, 0f, 0f);
+        _modelSwingRot = _modelBaseRot * Quaternion.Euler(70f, 0f, 0f);
 
         Debug.Log("[FPSWeapon] Weapon attached to camera");
     }
@@ -102,7 +105,7 @@ public class FPSWeapon : MonoBehaviour
     private void Swing()
     {
         Vector3 origin = fpsCamera.transform.position;
-        Collider[] hits = Physics.OverlapSphere(origin + fpsCamera.transform.forward * 1.5f, 1f);
+        Collider[] hits = Physics.OverlapSphere(origin + fpsCamera.transform.forward * 0.8f, 0.4f);
         foreach (var col in hits)
         {
             FPSHealth health = col.GetComponentInParent<FPSHealth>();

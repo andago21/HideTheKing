@@ -14,6 +14,11 @@ public class BattleChessManager : NetworkBehaviour
     public float battleStartDistance = 3f;
     public float cameraHeightOffset  = 1.6f;
 
+    [Header("UI")]
+    public GameObject crosshair;
+
+
+
     private Piece _attacker;
     private Piece _defender;
     private bool  _battleActive = false;
@@ -140,6 +145,9 @@ public class BattleChessManager : NetworkBehaviour
 
         // 8. Unsichtbaren FPS-Körper erstellen
         _localFPSBody = CreateFPSBody(myPos, enemyPos, mainCam, stats, myFigure.transform);
+
+        // Crosshair aktivieren
+        if (crosshair != null) crosshair.SetActive(true);
 
         Debug.Log($"[BattleChess] Setup complete. I am {myFigure.type}, facing {enemyFigure.type}");
     }
@@ -274,9 +282,10 @@ public class BattleChessManager : NetworkBehaviour
             Destroy(child.gameObject);
 
         GameObject enemyWeapon = Instantiate(reg.weaponPrefabFPS, holder);
-        enemyWeapon.transform.localPosition = Vector3.zero;
-        enemyWeapon.transform.localRotation = Quaternion.Euler(-90f, 180f, 0f); // stand upright, rotated 180 on Y
-        enemyWeapon.transform.localScale    = Vector3.one * 0.05f;
+        ThemeWeaponRegistry r = ThemeWeaponRegistry.Instance;
+        enemyWeapon.transform.localPosition = r != null ? r.enemyWeaponPosition : new Vector3(0f, 0f, 0.01f);
+        enemyWeapon.transform.localRotation = Quaternion.Euler(r != null ? r.enemyWeaponRotation : new Vector3(0f, 90f, 0f));
+        enemyWeapon.transform.localScale    = Vector3.one * (r != null ? r.enemyWeaponScale : 0.0015f);
         enemyWeapon.SetActive(true);
         _spawnedFigureWeapon = enemyWeapon;
     }
@@ -422,7 +431,7 @@ public class BattleChessManager : NetworkBehaviour
             camCtrl.RestoreFromFPS();
             // Restore default near clip plane
             Camera mainCam = camCtrl.GetMainCamera();
-            if (mainCam != null) mainCam.nearClipPlane = 0.1f;
+            if (mainCam != null) mainCam.nearClipPlane = 0.3f;
         }
 
         // 5. Schachbrett-Ergebnis anwenden
@@ -470,11 +479,24 @@ public class BattleChessManager : NetworkBehaviour
             board.enPassantTarget = new Vector2Int(-1, -1);
 
             // Turn-Wechsel: nur der Host setzt isWhiteTurn
-            // Der Angreifer hat den Zug gemacht — nach dem Kampf ist der Gegner dran
-            // PlayerInput hat den Turn NICHT umgeschaltet (wegen early return)
-            // Also schalten wir hier genau einmal um
             if (NetworkServer.active)
                 board.isWhiteTurn = !board.isWhiteTurn;
+
+            // Checkmate/Stalemate prüfen nach Battle Chess
+            GameRules gameRules = FindObjectOfType<GameRules>();
+            if (gameRules != null)
+                gameRules.CheckGameEndConditions(!board.isWhiteTurn);
+
+            // Spielende ans Netzwerk senden wenn nötig
+            if (board.gameState != GameState.Playing)
+            {
+                ChessNetworkManager net = ChessNetworkManager.LocalInstance;
+                if (net != null && net.IsMultiplayer())
+                {
+                    net.SendGameEnd(board.gameState);
+                    net.SendEloSync(board.gameState);
+                }
+            }
         }
 
         // 6. Andere Figuren wiederherstellen
@@ -487,6 +509,9 @@ public class BattleChessManager : NetworkBehaviour
         // 8. Cursor zurücksetzen
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible   = true;
+
+        // Crosshair deaktivieren
+        if (crosshair != null) crosshair.SetActive(false);
 
         Debug.Log("[BattleChess] Normal chess resumed.");
     }

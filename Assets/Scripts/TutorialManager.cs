@@ -86,7 +86,6 @@ public class TutorialManager : MonoBehaviour
     // Selection state — piece must be clicked first before a destination click moves it
     bool _pieceSelected;
 
-    GameState _lastGameState = GameState.Playing;
     Coroutine _pendingClearRoutine;
 
     void Awake()
@@ -100,15 +99,14 @@ public class TutorialManager : MonoBehaviour
     void Start()
     {
         if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
-        if (boardManager != null) _lastGameState = boardManager.gameState;
         EnsureSquaresAttached();
     }
 
     void EnsureSquaresAttached()
     {
-        // Starting another tutorial mode should cancel any queued auto-clear from the previous one.
         CancelPendingTutorialClear();
 
+        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
         if ((squares == null || squares.Length != 64) && boardManager != null)
             squares = boardManager.squares;
         if (squares == null || squares.Length != 64) return;
@@ -126,30 +124,7 @@ public class TutorialManager : MonoBehaviour
             }
         }
     }
-
-    void Update()
-    {
-        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
-        if (boardManager == null) return;
-        var state = boardManager.gameState;
-        if (state == _lastGameState) return;
-        if ((state == GameState.WhiteWins || state == GameState.BlackWins) && LocalPlayerWon(state))
-        {
-            SetCanvas(sourceCanvas, true);
-            SetCanvas(rookTargetCanvas, false);
-            SetCanvas(bishopTargetCanvas, false);
-            SetCanvas(queenTargetCanvas, false);
-            SetCanvas(kingTargetCanvas, false);
-            SetCanvas(knightTargetCanvas, false);
-            SetCanvas(pawnTargetCanvas, false);
-            SetCanvas(captureTargetCanvas, false);
-            SetCanvas(stalemateTargetCanvas, false);
-            SetCanvas(castlingTargetCanvas, false);
-            SetCanvas(enPassantTargetCanvas, false);
-        }
-        _lastGameState = state;
-    }
-
+    
     // ── Tutorial is only active when a piece instance exists ──────────────────
     public bool TutorialActive => _rookInstance != null || _bishopInstance != null || _queenInstance != null || _kingInstance != null || _knightInstance != null || _pawnInstance != null;
 
@@ -180,7 +155,7 @@ public class TutorialManager : MonoBehaviour
 
     Piece GetActivePiece()
     {
-        if (_pawnInstance != null) return _pawnInstance.GetComponent<Piece>();
+        if (_pawnInstance != null) return _pawnInstance.GetComponent<PawnPiece>();
         if (_knightInstance != null) return _knightInstance.GetComponent<Piece>();
         if (_kingInstance != null) return _kingInstance.GetComponent<Piece>();
         if (_queenInstance != null) return _queenInstance.GetComponent<Piece>();
@@ -193,19 +168,9 @@ public class TutorialManager : MonoBehaviour
     {
         _pieceSelected = true;
 
-        // Visual feedback: highlight the piece or log selection
-        Debug.Log("Tutorial piece selected. Click a highlighted square to move.");
-
         // Optional: Add a material highlight to the selected piece
         var activePieceInstance = _pawnInstance ?? _knightInstance ?? _kingInstance ?? _queenInstance ?? _rookInstance ?? _bishopInstance;
-        switch (activePieceInstance)
-        {
-            case null:
-                break;
-            default:
-                HighlightPiece(activePieceInstance);
-                break;
-        }
+        if (activePieceInstance != null) HighlightPiece(activePieceInstance);
 
         // Always show legal move highlights when piece is selected.
         ClearLegalMoveHighlights();
@@ -217,34 +182,13 @@ public class TutorialManager : MonoBehaviour
         Piece piece = GetActivePiece();
         if (piece == null) return;
 
-        var legal = piece.GetLegalMovesWithCheckValidation(boardManager != null
-            ? boardManager.boardPieces
-            : new Piece[8, 8]);
+        var board = boardManager != null ? boardManager.boardPieces : new Piece[8, 8];
 
-        // Fallback if check validation fails
-        if (legal == null || legal.Count == 0)
-        {
-            var raw = piece.GetLegalMoves(boardManager != null ? boardManager.boardPieces : new Piece[8, 8]);
-            if (raw != null && raw.Count > 0)
-            {
-                legal = raw;
-            }
-            else
-            {
-                if (_rookInstance   != null) legal = GenerateRookMoves(piece.position, piece.isWhite);
-                else if (_bishopInstance != null) legal = GenerateBishopMoves(piece.position, piece.isWhite);
-                else if (_queenInstance  != null) legal = GenerateQueenMoves(piece.position, piece.isWhite);
-                else if (_kingInstance   != null) legal = GenerateKingMoves(piece.position, piece.isWhite);
-                else if (_knightInstance != null) legal = GenerateKnightMoves(piece.position, piece.isWhite);
-                else if (_pawnInstance   != null) legal = GeneratePawnMoves(piece.position, piece.isWhite, piece.hasMoved);
-                if (legal == null) legal = new List<Vector2Int>();
-            }
-        }
+        // For pawn, skip check validation since pawn tutorials don't have a king
+        var legal = piece is PawnPiece ? piece.GetLegalMoves(board) : piece.GetLegalMovesWithCheckValidation(board);
+        if (legal.Count == 0)
+            legal = piece.GetLegalMoves(board);
 
-        // Show base highlightPrefab for every legal move square.
-        // If that square is also a tutorial target the Layer2 star is already
-        // there and both will coexist. If a target square is NOT a legal move
-        // only the star stays (no base highlight).
         foreach (var move in legal)
         {
             int moveIndex = move.x * 8 + move.y;
@@ -272,14 +216,7 @@ public class TutorialManager : MonoBehaviour
 
         // Reset visual feedback
         var activePieceInstance = _pawnInstance ?? _knightInstance ?? _kingInstance ?? _queenInstance ?? _rookInstance ?? _bishopInstance;
-        switch (activePieceInstance)
-        {
-            case null:
-                break;
-            default:
-                RestorePieceAppearance(activePieceInstance);
-                break;
-        }
+        if (activePieceInstance != null) RestorePieceAppearance(activePieceInstance);
     }
 
     void RestorePieceAppearance(GameObject piece)
@@ -288,10 +225,7 @@ public class TutorialManager : MonoBehaviour
         var renderers = piece.GetComponentsInChildren<Renderer>();
         foreach (var rend in renderers)
         {
-            foreach (var material in rend.materials)
-            {
-                material.color = material.color / 1.2f; // Restore original brightness
-            }
+            foreach (var material in rend.materials) material.color = material.color / 1.2f; // Restore original brightness
         }
     }
 
@@ -318,15 +252,11 @@ public class TutorialManager : MonoBehaviour
     public void OnRookButton()
     {
         EnsureSquaresAttached();
-        ResetEnPassantTutorialState();
         SetCanvas(sourceCanvas, false);
         SetCanvas(rookTargetCanvas, true);
         SetCanvas(captureTargetCanvas, false);
         SetCanvas(stalemateTargetCanvas, false);
         SetCanvas(enPassantTargetCanvas, false);
-
-        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
-        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
 
         if (rookSpawnTransform != null)
         {
@@ -350,7 +280,6 @@ public class TutorialManager : MonoBehaviour
     public void OnBishopButton()
     {
         EnsureSquaresAttached();
-        ResetEnPassantTutorialState();
         SetCanvas(sourceCanvas, false);
         SetCanvas(rookTargetCanvas, false);
         SetCanvas(bishopTargetCanvas, true);
@@ -358,8 +287,6 @@ public class TutorialManager : MonoBehaviour
         SetCanvas(stalemateTargetCanvas, false);
         SetCanvas(enPassantTargetCanvas, false);
 
-        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
-        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
 
         if (bishopSpawnTransform != null)
         {
@@ -381,7 +308,6 @@ public class TutorialManager : MonoBehaviour
     public void OnQueenButton()
     {
         EnsureSquaresAttached();
-        ResetEnPassantTutorialState();
         SetCanvas(sourceCanvas, false);
         SetCanvas(rookTargetCanvas, false);
         SetCanvas(bishopTargetCanvas, false);
@@ -390,8 +316,6 @@ public class TutorialManager : MonoBehaviour
         SetCanvas(stalemateTargetCanvas, false);
         SetCanvas(enPassantTargetCanvas, false);
 
-        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
-        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
 
         if (queenSpawnTransform != null)
         {
@@ -415,7 +339,6 @@ public class TutorialManager : MonoBehaviour
     public void OnKingButton()
     {
         EnsureSquaresAttached();
-        ResetEnPassantTutorialState();
         SetCanvas(sourceCanvas, false);
         SetCanvas(rookTargetCanvas, false);
         SetCanvas(bishopTargetCanvas, false);
@@ -425,8 +348,6 @@ public class TutorialManager : MonoBehaviour
         SetCanvas(stalemateTargetCanvas, false);
         SetCanvas(enPassantTargetCanvas, false);
 
-        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
-        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
 
         if (kingSpawnTransform != null)
         {
@@ -450,10 +371,7 @@ public class TutorialManager : MonoBehaviour
     public void OnCastlingButton()
     {
         EnsureSquaresAttached();
-        ResetEnPassantTutorialState();
 
-        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
-        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
 
         if (boardManager != null)
         {
@@ -529,7 +447,6 @@ public class TutorialManager : MonoBehaviour
     public void OnKnightButton()
     {
         EnsureSquaresAttached();
-        ResetEnPassantTutorialState();
         SetCanvas(sourceCanvas, false);
         SetCanvas(rookTargetCanvas, false);
         SetCanvas(bishopTargetCanvas, false);
@@ -540,8 +457,6 @@ public class TutorialManager : MonoBehaviour
         SetCanvas(stalemateTargetCanvas, false);
         SetCanvas(enPassantTargetCanvas, false);
 
-        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
-        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
 
         if (knightSpawnTransform != null)
         {
@@ -550,7 +465,6 @@ public class TutorialManager : MonoBehaviour
         }
         else  InstantiateKnightAtAlgebraic("d4");
         
-
         ClearHighlights();
         _pieceSelected = false;
 
@@ -563,7 +477,6 @@ public class TutorialManager : MonoBehaviour
     public void OnPawnButton()
     {
         EnsureSquaresAttached();
-        ResetEnPassantTutorialState();
         SetCanvas(sourceCanvas, false);
         SetCanvas(rookTargetCanvas, false);
         SetCanvas(bishopTargetCanvas, false);
@@ -576,8 +489,6 @@ public class TutorialManager : MonoBehaviour
         SetCanvas(castlingTargetCanvas, false);
         SetCanvas(enPassantTargetCanvas, false);
 
-        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
-        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
 
         if (pawnSpawnTransform != null)
         {
@@ -598,7 +509,6 @@ public class TutorialManager : MonoBehaviour
     public void OnCaptureButton()
     {
         EnsureSquaresAttached();
-        ResetEnPassantTutorialState();
         SetCanvas(sourceCanvas, false);
         SetCanvas(rookTargetCanvas, false);
         SetCanvas(bishopTargetCanvas, false);
@@ -611,8 +521,6 @@ public class TutorialManager : MonoBehaviour
         SetCanvas(castlingTargetCanvas, false);
         SetCanvas(enPassantTargetCanvas, false);
 
-        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
-        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
 
         ClearHighlights();
         ClearCapturePawns();
@@ -625,35 +533,25 @@ public class TutorialManager : MonoBehaviour
             int spawnIndex = GetIndexFromTransform(captureRookSpawnTransform);
             InstantiateRookAtIndex(spawnIndex);
         }
-        else
-        {
-            InstantiateRookAtAlgebraic("d4");
-        }
+        else InstantiateRookAtAlgebraic("d4");
 
         if (capturePawnSpawnTransformA != null)
         {
             int pawnAIndex = GetIndexFromTransform(capturePawnSpawnTransformA);
             InstantiateCapturePawnAtIndex(pawnAIndex);
         }
-        else
-        {
-            InstantiateCapturePawnAtAlgebraic("d6");
-        }
+        else InstantiateCapturePawnAtAlgebraic("d6");
 
         if (capturePawnSpawnTransformB != null)
         {
             int pawnBIndex = GetIndexFromTransform(capturePawnSpawnTransformB);
             InstantiateCapturePawnAtIndex(pawnBIndex);
         }
-        else
-        {
-            InstantiateCapturePawnAtAlgebraic("g4");
-        }
+        else InstantiateCapturePawnAtAlgebraic("g4");
     }
 
     public void OnBackButton()
     {
-        ResetEnPassantTutorialState();
         ClearHighlights();
         ClearRook();
         ClearBishop();
@@ -685,10 +583,7 @@ public class TutorialManager : MonoBehaviour
     public void OnStalemateButton()
     {
         EnsureSquaresAttached();
-        ResetEnPassantTutorialState();
 
-        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
-        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
 
         if (boardManager != null)
         {
@@ -719,28 +614,19 @@ public class TutorialManager : MonoBehaviour
         {
             InstantiateBishopAtIndex(GetIndexFromTransform(stalemateBishopSpawnTransform));
         }
-        else
-        {
-            InstantiateBishopAtAlgebraic("g5");
-        }
+        else  InstantiateBishopAtAlgebraic("g5");
 
         if (stalemateRookSpawnTransform != null)
         {
             InstantiateStalemateRookAtIndex(GetIndexFromTransform(stalemateRookSpawnTransform));
         }
-        else
-        {
-            InstantiateStalemateRookAtAlgebraic("b3");
-        }
+        else   InstantiateStalemateRookAtAlgebraic("b3");
 
         if (stalemateKingSpawnTransform != null)
         {
             InstantiateStalemateBlackKingAtIndex(GetIndexFromTransform(stalemateKingSpawnTransform));
         }
-        else
-        {
-            InstantiateStalemateBlackKingAtAlgebraic("a8");
-        }
+        else InstantiateStalemateBlackKingAtAlgebraic("a8");
 
         if (stalemateHighlightTransforms != null && stalemateHighlightTransforms.Length > 0)
         {
@@ -762,11 +648,7 @@ public class TutorialManager : MonoBehaviour
     public void OnEnPassantButton()
     {
         EnsureSquaresAttached();
-        ResetEnPassantTutorialState();
-
-        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
-        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
-
+        
         if (boardManager != null)
         {
             ClearEntireBoard();
@@ -848,10 +730,6 @@ public class TutorialManager : MonoBehaviour
         }
     }
 
-    void ResetEnPassantTutorialState()
-    {
-        // Retained for button flow symmetry; no state to reset in single-pawn en passant mode.
-    }
 
     void ClearLooseHighlightClones()    {
         string baseHighlightName = highlightPrefab != null ? highlightPrefab.name + "(Clone)" : null;
@@ -867,32 +745,6 @@ public class TutorialManager : MonoBehaviour
                 Destroy(go);
             }
         }
-    }
-
-    public void ShowHighlightAtIndex(int index)
-    {
-        if (!IsValidIndex(index) || highlightPrefab == null) return;
-        var pos = squares[index].position + new Vector3(-0.5f, highlightYOffset, +0.5f);
-        var h = Instantiate(highlightPrefab, pos, highlightPrefab.transform.rotation, squares[index]);
-        h.name = "Tutorial_Highlight_" + IndexToAlgebraic(index);
-
-        var th = h.GetComponent<TutorialHighlight>() ?? h.AddComponent<TutorialHighlight>();
-        th.index = index;
-        th.manager = this;
-        _tutorialTargets.Add(index);
-
-        var col = h.GetComponent<Collider>();
-        if (col == null)
-        {
-            var bc = h.AddComponent<BoxCollider>();
-            bc.isTrigger = false;
-            bc.center = Vector3.zero;
-            bc.size = new Vector3(1f, 0.1f, 1f);
-        }
-        else col.isTrigger = false;
-
-        SetLayerRecursively(h.gameObject, squares[index].gameObject.layer);
-        _highlights.Add(h);
     }
 
     public void ShowLegalMoveHighlightAtIndex(int index)
@@ -948,46 +800,16 @@ public class TutorialManager : MonoBehaviour
 
     public void MoveTutorialRookToIndex(int index)
     {
-        Debug.Log($"MoveTutorialRookToIndex called with index={index}");
-        if (_rookInstance == null || !IsValidIndex(index))
-        {
-            Debug.Log("Invalid move attempt.");
-            return;
-        }
+        if (_rookInstance == null || !IsValidIndex(index)) return;
 
         var piece = _rookInstance.GetComponent<Piece>();
         if (piece == null) return;
 
-        var legal = piece.GetLegalMovesWithCheckValidation(boardManager != null
-            ? boardManager.boardPieces
-            : new Piece[8, 8]);
-        // Fallbacks: try raw Piece moves, then simple generator if prefab doesn't provide move logic
-        if (legal == null || legal.Count == 0)
-        {
-            var raw = piece.GetLegalMoves(boardManager != null ? boardManager.boardPieces : new Piece[8,8]);
-            if (raw != null && raw.Count > 0) legal = raw;
-            else
-            {
-                legal = GenerateRookMoves(piece.position, piece.isWhite);
-                Debug.LogWarning("Using generated rook moves as fallback for tutorial piece.");
-            }
-        }
+        var board = boardManager != null ? boardManager.boardPieces : new Piece[8, 8];
+        var legal = piece.GetLegalMovesWithCheckValidation(board);
+        if (legal.Count == 0) legal = piece.GetLegalMoves(board);
         var target = new Vector2Int(index / 8, index % 8);
-        if (!legal.Contains(target))
-        {
-            // Diagnostic logging: show why move considered illegal
-            string legalStr = "";
-            foreach (var m in legal) legalStr += IndexToAlgebraic(m.x * 8 + m.y) + ",";
-            Debug.LogWarning($"Move not allowed to {IndexToAlgebraic(index)}. Piece at {IndexToAlgebraic(piece.position.x*8 + piece.position.y)}. Legal moves: {legalStr}");
-
-            if (boardManager?.boardPieces != null)
-            {
-                var targetPiece = boardManager.boardPieces[target.x, target.y];
-                var targetPieceType = targetPiece != null ? targetPiece.type.ToString() : "null";
-                Debug.Log("Board at target " + IndexToAlgebraic(index) + " contains: " + targetPieceType);
-            }
-            return;
-        }
+        if (!legal.Contains(target)) return;
 
         bool clearedAllCapturePawns = false;
 
@@ -1008,10 +830,7 @@ public class TutorialManager : MonoBehaviour
         piece.position = target;
         piece.hasMoved = true;
 
-        if (clearedAllCapturePawns)
-        {
-            ClearTutorial();
-        }
+        if (clearedAllCapturePawns) ClearTutorial();
 
         if (_tutorialTargets.Contains(index))
         {
@@ -1019,55 +838,21 @@ public class TutorialManager : MonoBehaviour
             if (_visitedTargets.Count == _tutorialTargets.Count) ClearTutorial();
         }
 
-        Debug.Log($"Tutorial rook moved to {IndexToAlgebraic(index)}");
     }
 
     // Move tutorial bishop (same validation as rook)
     public void MoveTutorialBishopToIndex(int index)
     {
-        Debug.Log($"MoveTutorialBishopToIndex called with index={index}");
-        if (_bishopInstance == null || !IsValidIndex(index))
-        {
-            Debug.Log("Invalid move attempt.");
-            return;
-        }
+        if (_bishopInstance == null || !IsValidIndex(index))  return;
 
         var piece = _bishopInstance.GetComponent<Piece>();
         if (piece == null) return;
 
-        var legal = piece.GetLegalMovesWithCheckValidation(boardManager != null
-            ? boardManager.boardPieces
-            : new Piece[8, 8]);
-        if ((legal == null || legal.Count == 0))
-        {
-            var raw = piece.GetLegalMoves(boardManager != null ? boardManager.boardPieces : new Piece[8,8]);
-            if (raw != null && raw.Count > 0)
-            {
-                legal = raw;
-                Debug.LogWarning("Using raw GetLegalMoves fallback for tutorial piece (check-validation returned empty).");
-            }
-            else
-            {
-                legal = GenerateBishopMoves(piece.position, piece.isWhite);
-                Debug.LogWarning("Using generated bishop moves as fallback for tutorial piece.");
-            }
-        }
+        var board = boardManager != null ? boardManager.boardPieces : new Piece[8, 8];
+        var legal = piece.GetLegalMovesWithCheckValidation(board);
+        if (legal.Count == 0) legal = piece.GetLegalMoves(board);
         var target = new Vector2Int(index / 8, index % 8);
-        if (!legal.Contains(target))
-        {
-            // Diagnostic logging: show why move considered illegal
-            string legalStr = "";
-            foreach (var m in legal) legalStr += IndexToAlgebraic(m.x * 8 + m.y) + ",";
-            Debug.LogWarning($"Move not allowed to {IndexToAlgebraic(index)}. Piece at {IndexToAlgebraic(piece.position.x*8 + piece.position.y)}. Legal moves: {legalStr}");
-
-            if (boardManager?.boardPieces != null)
-            {
-                var targetPiece = boardManager.boardPieces[target.x, target.y];
-                var targetPieceType = targetPiece != null ? targetPiece.type.ToString() : "null";
-                Debug.Log("Board at target " + IndexToAlgebraic(index) + " contains: " + targetPieceType);
-            }
-            return;
-        }
+        if (!legal.Contains(target)) return;
 
         if (boardManager?.boardPieces != null)
         {
@@ -1091,53 +876,20 @@ public class TutorialManager : MonoBehaviour
         }
 
         DeselectPiece(); // Reset selection after move
-        Debug.Log($"Tutorial bishop moved to {IndexToAlgebraic(index)}");
     }
 
     public void MoveTutorialQueenToIndex(int index)
     {
-        Debug.Log($"MoveTutorialQueenToIndex called with index={index}");
-        if (_queenInstance == null || !IsValidIndex(index))
-        {
-            Debug.Log("Invalid move attempt.");
-            return;
-        }
+        if (_queenInstance == null || !IsValidIndex(index))  return;
 
         var piece = _queenInstance.GetComponent<Piece>();
         if (piece == null) return;
 
-        var legal = piece.GetLegalMovesWithCheckValidation(boardManager != null
-            ? boardManager.boardPieces
-            : new Piece[8, 8]);
-        if (legal == null || legal.Count == 0)
-        {
-            var raw = piece.GetLegalMoves(boardManager != null ? boardManager.boardPieces : new Piece[8,8]);
-            if (raw != null && raw.Count > 0)
-            {
-                legal = raw;
-                Debug.LogWarning("Using raw GetLegalMoves fallback for tutorial piece (check-validation returned empty).");
-            }
-            else
-            {
-                legal = GenerateQueenMoves(piece.position, piece.isWhite);
-                Debug.LogWarning("Using generated queen moves as fallback for tutorial piece.");
-            }
-        }
+        var board = boardManager != null ? boardManager.boardPieces : new Piece[8, 8];
+        var legal = piece.GetLegalMovesWithCheckValidation(board);
+        if (legal.Count == 0) legal = piece.GetLegalMoves(board);
         var target = new Vector2Int(index / 8, index % 8);
-        if (!legal.Contains(target))
-        {
-            string legalStr = "";
-            foreach (var m in legal) legalStr += IndexToAlgebraic(m.x * 8 + m.y) + ",";
-            Debug.LogWarning($"Move not allowed to {IndexToAlgebraic(index)}. Piece at {IndexToAlgebraic(piece.position.x*8 + piece.position.y)}. Legal moves: {legalStr}");
-
-            if (boardManager?.boardPieces != null)
-            {
-                var targetPiece = boardManager.boardPieces[target.x, target.y];
-                var targetPieceType = targetPiece != null ? targetPiece.type.ToString() : "null";
-                Debug.Log("Board at target " + IndexToAlgebraic(index) + " contains: " + targetPieceType);
-            }
-            return;
-        }
+        if (!legal.Contains(target))  return;
 
         if (boardManager?.boardPieces != null)
         {
@@ -1161,17 +913,11 @@ public class TutorialManager : MonoBehaviour
         }
 
         DeselectPiece();
-        Debug.Log($"Tutorial queen moved to {IndexToAlgebraic(index)}");
     }
 
     public void MoveTutorialKingToIndex(int index)
     {
-        Debug.Log($"MoveTutorialKingToIndex called with index={index}");
-        if (_kingInstance == null || !IsValidIndex(index))
-        {
-            Debug.Log("Invalid move attempt.");
-            return;
-        }
+        if (_kingInstance == null || !IsValidIndex(index)) return;
 
         var piece = _kingInstance.GetComponent<Piece>();
         if (piece == null) return;
@@ -1180,42 +926,15 @@ public class TutorialManager : MonoBehaviour
         var target = new Vector2Int(index / 8, index % 8);
         bool isCastlingAttempt = old.x == target.x && Mathf.Abs(target.y - old.y) == 2;
 
-        var legal = piece.GetLegalMovesWithCheckValidation(boardManager != null
-            ? boardManager.boardPieces
-            : new Piece[8, 8]);
-        if (legal == null || legal.Count == 0)
-        {
-            var raw = piece.GetLegalMoves(boardManager != null ? boardManager.boardPieces : new Piece[8,8]);
-            if (raw != null && raw.Count > 0)
-            {
-                legal = raw;
-                Debug.LogWarning("Using raw GetLegalMoves fallback for tutorial piece (check-validation returned empty).");
-            }
-            else
-            {
-                legal = GenerateKingMoves(piece.position, piece.isWhite);
-                Debug.LogWarning("Using generated king moves as fallback for tutorial piece.");
-            }
-        }
+        var board = boardManager != null ? boardManager.boardPieces : new Piece[8, 8];
+        var legal = piece.GetLegalMovesWithCheckValidation(board);
+        if (legal.Count == 0) legal = piece.GetLegalMoves(board);
 
         // Keep castling available in tutorial mode even if the piece script omits it.
         if (isCastlingAttempt && CanCastleInTutorial(old, target, piece.isWhite) && !legal.Contains(target))
             legal.Add(target);
 
-        if (!legal.Contains(target))
-        {
-            string legalStr = "";
-            foreach (var m in legal) legalStr += IndexToAlgebraic(m.x * 8 + m.y) + ",";
-            Debug.LogWarning($"Move not allowed to {IndexToAlgebraic(index)}. Piece at {IndexToAlgebraic(piece.position.x*8 + piece.position.y)}. Legal moves: {legalStr}");
-
-            if (boardManager?.boardPieces != null)
-            {
-                var targetPiece = boardManager.boardPieces[target.x, target.y];
-                var targetPieceType = targetPiece != null ? targetPiece.type.ToString() : "null";
-                Debug.Log("Board at target " + IndexToAlgebraic(index) + " contains: " + targetPieceType);
-            }
-            return;
-        }
+        if (!legal.Contains(target)) return;
 
         if (boardManager?.boardPieces != null)
         {
@@ -1231,10 +950,7 @@ public class TutorialManager : MonoBehaviour
         piece.position = target;
         piece.hasMoved = true;
 
-        if (isCastlingAttempt)
-        {
-            MoveCastlingRook(old, target, piece.isWhite);
-        }
+        if (isCastlingAttempt) MoveCastlingRook(old, target, piece.isWhite);
 
         if (_tutorialTargets.Contains(index))
         {
@@ -1243,53 +959,20 @@ public class TutorialManager : MonoBehaviour
         }
 
         DeselectPiece();
-        Debug.Log($"Tutorial king moved to {IndexToAlgebraic(index)}");
     }
 
     public void MoveTutorialKnightToIndex(int index)
     {
-        Debug.Log($"MoveTutorialKnightToIndex called with index={index}");
-        if (_knightInstance == null || !IsValidIndex(index))
-        {
-            Debug.Log("Invalid move attempt.");
-            return;
-        }
+        if (_knightInstance == null || !IsValidIndex(index))  return;
 
         var piece = _knightInstance.GetComponent<Piece>();
         if (piece == null) return;
 
-        var legal = piece.GetLegalMovesWithCheckValidation(boardManager != null
-            ? boardManager.boardPieces
-            : new Piece[8, 8]);
-        if (legal == null || legal.Count == 0)
-        {
-            var raw = piece.GetLegalMoves(boardManager != null ? boardManager.boardPieces : new Piece[8,8]);
-            if (raw != null && raw.Count > 0)
-            {
-                legal = raw;
-                Debug.LogWarning("Using raw GetLegalMoves fallback for tutorial piece (check-validation returned empty).");
-            }
-            else
-            {
-                legal = GenerateKnightMoves(piece.position, piece.isWhite);
-                Debug.LogWarning("Using generated knight moves as fallback for tutorial piece.");
-            }
-        }
+        var board = boardManager != null ? boardManager.boardPieces : new Piece[8, 8];
+        var legal = piece.GetLegalMovesWithCheckValidation(board);
+        if (legal.Count == 0) legal = piece.GetLegalMoves(board);
         var target = new Vector2Int(index / 8, index % 8);
-        if (!legal.Contains(target))
-        {
-            string legalStr = "";
-            foreach (var m in legal) legalStr += IndexToAlgebraic(m.x * 8 + m.y) + ",";
-            Debug.LogWarning($"Move not allowed to {IndexToAlgebraic(index)}. Piece at {IndexToAlgebraic(piece.position.x*8 + piece.position.y)}. Legal moves: {legalStr}");
-
-            if (boardManager?.boardPieces != null)
-            {
-                var targetPiece = boardManager.boardPieces[target.x, target.y];
-                var targetPieceType = targetPiece != null ? targetPiece.type.ToString() : "null";
-                Debug.Log("Board at target " + IndexToAlgebraic(index) + " contains: " + targetPieceType);
-            }
-            return;
-        }
+        if (!legal.Contains(target)) return;
 
         if (boardManager?.boardPieces != null)
         {
@@ -1313,53 +996,19 @@ public class TutorialManager : MonoBehaviour
         }
 
         DeselectPiece();
-        Debug.Log($"Tutorial knight moved to {IndexToAlgebraic(index)}");
     }
 
     public void MoveTutorialPawnToIndex(int index)
     {
-        Debug.Log($"MoveTutorialPawnToIndex called with index={index}");
-        if (_pawnInstance == null || !IsValidIndex(index))
-        {
-            Debug.Log("Invalid move attempt.");
-            return;
-        }
+        if (_pawnInstance == null || !IsValidIndex(index)) return;
 
-        var piece = _pawnInstance.GetComponent<Piece>();
+        var piece = _pawnInstance.GetComponent<PawnPiece>();
         if (piece == null) return;
 
-        var legal = piece.GetLegalMovesWithCheckValidation(boardManager != null
-            ? boardManager.boardPieces
-            : new Piece[8, 8]);
-        if (legal == null || legal.Count == 0)
-        {
-            var raw = piece.GetLegalMoves(boardManager != null ? boardManager.boardPieces : new Piece[8,8]);
-            if (raw != null && raw.Count > 0)
-            {
-                legal = raw;
-                Debug.LogWarning("Using raw GetLegalMoves fallback for tutorial piece (check-validation returned empty).");
-            }
-            else
-            {
-                legal = GeneratePawnMoves(piece.position, piece.isWhite, piece.hasMoved);
-                Debug.LogWarning("Using generated pawn moves as fallback for tutorial piece.");
-            }
-        }
+        var board = boardManager != null ? boardManager.boardPieces : new Piece[8, 8];
+        var legal = piece.GetLegalMoves(board);  // Use raw moves, skip check validation for pawn
         var target = new Vector2Int(index / 8, index % 8);
-        if (!legal.Contains(target))
-        {
-            string legalStr = "";
-            foreach (var m in legal) legalStr += IndexToAlgebraic(m.x * 8 + m.y) + ",";
-            Debug.LogWarning($"Move not allowed to {IndexToAlgebraic(index)}. Piece at {IndexToAlgebraic(piece.position.x*8 + piece.position.y)}. Legal moves: {legalStr}");
-
-            if (boardManager?.boardPieces != null)
-            {
-                var targetPiece = boardManager.boardPieces[target.x, target.y];
-                var targetPieceType = targetPiece != null ? targetPiece.type.ToString() : "null";
-                Debug.Log("Board at target " + IndexToAlgebraic(index) + " contains: " + targetPieceType);
-            }
-            return;
-        }
+        if (!legal.Contains(target)) return;
 
         if (boardManager?.boardPieces != null)
         {
@@ -1397,8 +1046,7 @@ public class TutorialManager : MonoBehaviour
         if (piece.type == PieceType.Pawn && target.x == 7 && target.y == 0)
         {
             // Pawn reached a8 - promote to queen
-            Debug.Log("Pawn promoted to Queen at a8!");
-            
+
             if (queenPrefab != null)
             {
                 // Store the position where the pawn is
@@ -1489,7 +1137,6 @@ public class TutorialManager : MonoBehaviour
         }
 
         DeselectPiece();
-        Debug.Log($"Tutorial pawn moved to {IndexToAlgebraic(index)}");
     }
 
     // Generic entrypoint: move whichever tutorial piece is active (rook preferred)
@@ -1507,7 +1154,6 @@ public class TutorialManager : MonoBehaviour
         else if (_queenInstance != null) MoveTutorialQueenToIndex(index);
         else if (_rookInstance != null) MoveTutorialRookToIndex(index);
         else if (_bishopInstance != null) MoveTutorialBishopToIndex(index);
-        else Debug.Log("No tutorial piece present to move.");
     }
 
     void ClearTutorial()
@@ -1664,22 +1310,11 @@ public class TutorialManager : MonoBehaviour
         pos.y = 0f;
         _rookInstance = Instantiate(rookPrefab, pos, rookPrefab.transform.rotation);
         var piece = _rookInstance.GetComponent<Piece>();
-        if (piece == null)
-        {
-            piece = _rookInstance.AddComponent<Piece>();
-        }
-        // Ensure RookPiece script is present for proper move generation
-        var rookPiece = _rookInstance.GetComponent<RookPiece>();
-        if (rookPiece == null)
-        {
-            rookPiece = _rookInstance.AddComponent<RookPiece>();
-        }
-        if (piece != null)
-        {
-            piece.position = new Vector2Int(index / 8, index % 8);
-            piece.isWhite = true;
-            piece.hasMoved = false;
-        }
+        if (piece == null) piece = _rookInstance.AddComponent<Piece>();
+        if (_rookInstance.GetComponent<RookPiece>() == null) _rookInstance.AddComponent<RookPiece>();
+        piece.position = new Vector2Int(index / 8, index % 8);
+        piece.isWhite = true;
+        piece.hasMoved = false;
         if (boardManager?.boardPieces != null)
         {
             boardManager.boardPieces[index / 8, index % 8] = piece;
@@ -1879,19 +1514,12 @@ public class TutorialManager : MonoBehaviour
             child.localScale = new Vector3(32f, 32f, 32f);
         }
 
-        var piece = _pawnInstance.GetComponent<Piece>();
-        if (piece == null) piece = _pawnInstance.AddComponent<Piece>();
-
-        if (_pawnInstance.GetComponent<PawnPiece>() == null)
-            _pawnInstance.AddComponent<PawnPiece>();
-
-        if (piece != null)
-        {
-            piece.position = new Vector2Int(index / 8, index % 8);
-            piece.isWhite = true;
-            piece.hasMoved = false;
-            piece.type = PieceType.Pawn;
-        }
+        var piece = _pawnInstance.GetComponent<PawnPiece>();
+        if (piece == null) piece = _pawnInstance.AddComponent<PawnPiece>();
+        piece.position = new Vector2Int(index / 8, index % 8);
+        piece.isWhite = true;
+        piece.hasMoved = false;
+        piece.type = PieceType.Pawn;
 
         if (boardManager?.boardPieces != null)
         {
@@ -1960,7 +1588,7 @@ public class TutorialManager : MonoBehaviour
 
         piece.position = new Vector2Int(index / 8, index % 8);
         piece.isWhite = isWhite;
-        piece.hasMoved = pieceType != PieceType.King ? false : true;
+        piece.hasMoved = pieceType == PieceType.King;
         piece.type = pieceType;
 
         if (boardManager?.boardPieces != null)
@@ -2124,17 +1752,11 @@ public class TutorialManager : MonoBehaviour
 
         var piece = pawnInstance.GetComponent<Piece>();
         if (piece == null) piece = pawnInstance.AddComponent<Piece>();
-
-        if (pawnInstance.GetComponent<PawnPiece>() == null)
-            pawnInstance.AddComponent<PawnPiece>();
-
-        if (piece != null)
-        {
-            piece.position = new Vector2Int(index / 8, index % 8);
-            piece.isWhite = false;
-            piece.hasMoved = true;
-            piece.type = PieceType.Pawn;
-        }
+        if (pawnInstance.GetComponent<PawnPiece>() == null) pawnInstance.AddComponent<PawnPiece>();
+        piece.position = new Vector2Int(index / 8, index % 8);
+        piece.isWhite = false;
+        piece.hasMoved = true;
+        piece.type = PieceType.Pawn;
 
         if (boardManager?.boardPieces != null)
         {
@@ -2369,13 +1991,6 @@ public class TutorialManager : MonoBehaviour
     bool IsValidIndex(int idx) =>
         squares != null && squares.Length == 64 && idx >= 0 && idx < 64 && squares[idx] != null;
 
-    bool LocalPlayerWon(GameState state)
-    {
-        bool localIsWhite = ChessNetworkManager.LocalInstance != null
-            ? ChessNetworkManager.LocalInstance.isWhitePlayer
-            : true;
-        return (state == GameState.WhiteWins && localIsWhite) || (state == GameState.BlackWins && !localIsWhite);
-    }
 
     void SetLayerRecursively(GameObject go, int layer)
     {
@@ -2389,155 +2004,4 @@ public class TutorialManager : MonoBehaviour
         if (c == null) return;
         c.gameObject.SetActive(active);
     }
-
-    List<Vector2Int> GenerateRookMoves(Vector2Int pos, bool isWhite)
-    {
-        var moves = new List<Vector2Int>();
-        if (boardManager?.boardPieces == null) return moves;
-        Vector2Int[] dirs = { new Vector2Int(1,0), new Vector2Int(-1,0), new Vector2Int(0,1), new Vector2Int(0,-1)};
-        foreach (var d in dirs)
-        {
-            Vector2Int cur = pos + d;
-            while (Piece.IsInBounds(cur))
-            {
-                var p = boardManager.boardPieces[cur.x, cur.y];
-                if (p == null)  moves.Add(cur);
-                else
-                {
-                    if (p.isWhite != isWhite) moves.Add(cur);
-                    break;
-                }
-                cur += d;
-            }
-        }
-        return moves;
-    }
-
-    List<Vector2Int> GenerateBishopMoves(Vector2Int pos, bool isWhite)
-    {
-        var moves = new List<Vector2Int>();
-        if (boardManager?.boardPieces == null) return moves;
-        Vector2Int[] dirs = { new Vector2Int(1,1), new Vector2Int(1,-1), new Vector2Int(-1,1), new Vector2Int(-1,-1)};
-        foreach (var d in dirs)
-        {
-            Vector2Int cur = pos + d;
-            while (Piece.IsInBounds(cur))
-            {
-                var p = boardManager.boardPieces[cur.x, cur.y];
-                if (p == null)  moves.Add(cur);
-                else
-                {
-                    if (p.isWhite != isWhite) moves.Add(cur);
-                    break;
-                }
-                cur += d;
-            }
-        }
-        return moves;
-    }
-
-    List<Vector2Int> GenerateQueenMoves(Vector2Int pos, bool isWhite)
-    {
-        var set = new HashSet<Vector2Int>();
-        foreach (var m in GenerateRookMoves(pos, isWhite)) set.Add(m);
-        foreach (var m in GenerateBishopMoves(pos, isWhite)) set.Add(m);
-        return new List<Vector2Int>(set);
-    }
-
-    List<Vector2Int> GenerateKingMoves(Vector2Int pos, bool isWhite)
-    {
-        var moves = new List<Vector2Int>();
-        if (boardManager?.boardPieces == null) return moves;
-        
-        // King moves one square in any direction
-        for (int dx = -1; dx <= 1; dx++)
-        {
-            for (int dy = -1; dy <= 1; dy++)
-            {
-                if (dx == 0 && dy == 0) continue;
-                
-                Vector2Int target = new Vector2Int(pos.x + dx, pos.y + dy);
-                if (Piece.IsInBounds(target))
-                {
-                    var p = boardManager.boardPieces[target.x, target.y];
-                    if (p == null || p.isWhite != isWhite) moves.Add(target);
-                }
-            }
-        }
-        return moves;
-    }
-
-    List<Vector2Int> GenerateKnightMoves(Vector2Int pos, bool isWhite)
-    {
-        var moves = new List<Vector2Int>();
-        if (boardManager?.boardPieces == null) return moves;
-        
-        // Knight moves in L-shape: 2 squares in one direction, 1 square perpendicular
-        int[] dx = { 2, 2, -2, -2, 1, 1, -1, -1 };
-        int[] dy = { 1, -1, 1, -1, 2, -2, 2, -2 };
-        
-        for (int i = 0; i < 8; i++)
-        {
-            Vector2Int target = new Vector2Int(pos.x + dx[i], pos.y + dy[i]);
-            if (Piece.IsInBounds(target))
-            {
-                var p = boardManager.boardPieces[target.x, target.y];
-                if (p == null || p.isWhite != isWhite)  moves.Add(target);
-            }
-        }
-        return moves;
-    }
-
-    List<Vector2Int> GeneratePawnMoves(Vector2Int pos, bool isWhite, bool hasMoved)
-    {
-        var moves = new List<Vector2Int>();
-        if (boardManager?.boardPieces == null) return moves;
-        
-        // Pawn moves forward (white goes up, black goes down)
-        int direction = isWhite ? 1 : -1;
-        
-        // One square forward
-        Vector2Int forward = new Vector2Int(pos.x + direction, pos.y);
-        if (Piece.IsInBounds(forward) && boardManager.boardPieces[forward.x, forward.y] == null)
-        {
-            moves.Add(forward);
-            
-            // Two squares forward from starting position
-            if (!hasMoved)
-            {
-                Vector2Int doubleForward = new Vector2Int(pos.x + 2 * direction, pos.y);
-                if (Piece.IsInBounds(doubleForward) && boardManager.boardPieces[doubleForward.x, doubleForward.y] == null)
-                {
-                    moves.Add(doubleForward);
-                }
-            }
-        }
-        
-        // Diagonal captures
-        Vector2Int leftCapture = new Vector2Int(pos.x + direction, pos.y - 1);
-        if (Piece.IsInBounds(leftCapture))
-        {
-            var p = boardManager.boardPieces[leftCapture.x, leftCapture.y];
-            if (p != null && p.isWhite != isWhite) moves.Add(leftCapture);
-        }
-        
-        Vector2Int rightCapture = new Vector2Int(pos.x + direction, pos.y + 1);
-        if (Piece.IsInBounds(rightCapture))
-        {
-            var p = boardManager.boardPieces[rightCapture.x, rightCapture.y];
-            if (p != null && p.isWhite != isWhite) moves.Add(rightCapture);
-        }
-
-        // En passant
-        if (boardManager.enPassantTarget.x >= 0)
-        {
-            Vector2Int epLeft  = new Vector2Int(pos.x + direction, pos.y - 1);
-            Vector2Int epRight = new Vector2Int(pos.x + direction, pos.y + 1);
-            if (boardManager.enPassantTarget == epLeft)  moves.Add(epLeft);
-            if (boardManager.enPassantTarget == epRight) moves.Add(epRight);
-        }
-
-        return moves;
-    }
 }
-

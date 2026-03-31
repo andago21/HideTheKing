@@ -1002,111 +1002,48 @@ public class TutorialManager : MonoBehaviour
     {
         if (_pawnInstance == null || !IsValidIndex(index)) return;
 
-        var piece = _pawnInstance.GetComponent<PawnPiece>();
-        if (piece == null) return;
+        var pawn = _pawnInstance.GetComponent<PawnPiece>();
+        if (pawn == null) return;
 
+        Vector2Int target = new Vector2Int(index / 8, index % 8);
         var board = boardManager != null ? boardManager.boardPieces : new Piece[8, 8];
-        var legal = piece.GetLegalMoves(board);  // Use raw moves, skip check validation for pawn
-        var target = new Vector2Int(index / 8, index % 8);
+        var legal = pawn.GetLegalMoves(board);
         if (!legal.Contains(target)) return;
 
         if (boardManager?.boardPieces != null)
         {
-            var old = piece.position;
+            Vector2Int old = pawn.position;
             boardManager.boardPieces[old.x, old.y] = null;
-            var dest = boardManager.boardPieces[target.x, target.y];
-            if (dest != null && dest != piece) boardManager.SendToSide(dest);
-            boardManager.boardPieces[target.x, target.y] = piece;
 
-            // En passant capture: remove the captured pawn one rank behind the target
+            var dest = boardManager.boardPieces[target.x, target.y];
+            if (dest != null && dest != pawn) boardManager.SendToSide(dest);
+
             if (boardManager.enPassantTarget.x >= 0 && target == boardManager.enPassantTarget)
             {
-                int capturedRank = piece.isWhite ? target.x - 1 : target.x + 1;
+                int capturedRank = pawn.isWhite ? target.x - 1 : target.x + 1;
                 if (capturedRank >= 0 && capturedRank < 8)
                 {
                     var capturedPawn = boardManager.boardPieces[capturedRank, target.y];
-                    if (capturedPawn != null && capturedPawn.isWhite != piece.isWhite)
+                    if (capturedPawn != null && capturedPawn.isWhite != pawn.isWhite)
                     {
                         boardManager.boardPieces[capturedRank, target.y] = null;
                         boardManager.SendToSide(capturedPawn);
                     }
                 }
             }
+
+            boardManager.boardPieces[target.x, target.y] = pawn;
         }
 
-        var p = squares[index].position + pawnPositionOffset;
-        p.y = 0f;
-        _pawnInstance.transform.position = p;
+        var pos = squares[index].position + pawnPositionOffset;
+        pos.y = 0f;
+        _pawnInstance.transform.position = pos;
+        pawn.position = target;
+        pawn.hasMoved = true;
 
-        piece.position = target;
-        piece.hasMoved = true;
-
-        // Check for pawn promotion (pawn reaches a8 - rank 8 for white)
-        // a8 = file 0, rank 7 = position (7, 0)
-        if (piece.type == PieceType.Pawn && target.x == 7 && target.y == 0)
+        if (pawn.type == PieceType.Pawn && target.x == 7 && target.y == 0)
         {
-            // Pawn reached a8 - promote to queen
-
-            if (queenPrefab != null)
-            {
-                // Store the position where the pawn is
-                var pawnPos = _pawnInstance.transform.position;
-                var pawnRot = _pawnInstance.transform.rotation;
-                
-                // Destroy the pawn GameObject
-                Destroy(_pawnInstance);
-                
-                // Instantiate the queen prefab at the same position
-                _queenInstance = Instantiate(queenPrefab, pawnPos, pawnRot);
-                _pawnInstance = null;
-                
-                // Set up the queen piece component
-                var queenPiece = _queenInstance.GetComponent<Piece>();
-                if (queenPiece == null)
-                {
-                    queenPiece = _queenInstance.AddComponent<Piece>();
-                }
-                
-                // Ensure QueenPiece script is present
-                var queenPieceScript = _queenInstance.GetComponent<QueenPiece>();
-                if (queenPieceScript == null)
-                {
-                    queenPieceScript = _queenInstance.AddComponent<QueenPiece>();
-                }
-                
-                if (queenPiece != null)
-                {
-                    queenPiece.position = target;
-                    queenPiece.isWhite = true;
-                    queenPiece.hasMoved = true;
-                    queenPiece.type = PieceType.Queen;
-                }
-                
-                // Add collider
-                if (_queenInstance.GetComponent<Collider>() == null)
-                {
-                    var bc = _queenInstance.AddComponent<SphereCollider>();
-                    bc.radius = 0.3f;
-                    bc.isTrigger = false;
-                }
-                
-                // Add click handler
-                if (_queenInstance.GetComponent<TutorialPieceClickHandler>() == null)
-                {
-                    var handler = _queenInstance.AddComponent<TutorialPieceClickHandler>();
-                    handler.manager = this;
-                    handler.pieceIndex = index;
-                }
-                
-                // Update board
-                if (boardManager?.boardPieces != null)
-                {
-                    boardManager.boardPieces[target.x, target.y] = queenPiece;
-                }
-                
-                // Show promotion panel
-                ShowPromotionPanel();
-            }
+            PromotePawnToQueenAt(index, target);
         }
 
         if (_tutorialTargets.Contains(index))
@@ -1115,28 +1052,52 @@ public class TutorialManager : MonoBehaviour
             if (_visitedTargets.Count == _tutorialTargets.Count) ClearTutorial();
         }
 
-        // Remove all legal move highlights (keep only tutorial target highlights)
-        var highlightsToRemove = new List<GameObject>();
-        foreach (var h in _highlights)
-        {
-            if (h != null)
-            {
-                var th = h.GetComponent<TutorialHighlight>();
-                if (th != null && !_tutorialTargets.Contains(th.index))
-                {
-                    // This is a legal move highlight, not a tutorial target - remove it
-                    highlightsToRemove.Add(h);
-                }
-            }
-        }
-        
-        foreach (var h in highlightsToRemove)
-        {
-            _highlights.Remove(h);
-            Destroy(h);
-        }
+        ClearLegalMoveHighlights();
 
         DeselectPiece();
+    }
+
+    void PromotePawnToQueenAt(int index, Vector2Int target)
+    {
+        if (queenPrefab == null || _pawnInstance == null) return;
+
+        var pawnPos = _pawnInstance.transform.position;
+        var pawnRot = _pawnInstance.transform.rotation;
+        Destroy(_pawnInstance);
+
+        _queenInstance = Instantiate(queenPrefab, pawnPos, pawnRot);
+        _pawnInstance = null;
+
+        var queenPiece = _queenInstance.GetComponent<Piece>();
+        if (queenPiece == null) queenPiece = _queenInstance.AddComponent<Piece>();
+        if (_queenInstance.GetComponent<QueenPiece>() == null) _queenInstance.AddComponent<QueenPiece>();
+
+        if (queenPiece != null)
+        {
+            queenPiece.position = target;
+            queenPiece.isWhite = true;
+            queenPiece.hasMoved = true;
+            queenPiece.type = PieceType.Queen;
+        }
+
+        if (_queenInstance.GetComponent<Collider>() == null)
+        {
+            var bc = _queenInstance.AddComponent<SphereCollider>();
+            bc.radius = 0.3f;
+            bc.isTrigger = false;
+        }
+
+        if (_queenInstance.GetComponent<TutorialPieceClickHandler>() == null)
+        {
+            var handler = _queenInstance.AddComponent<TutorialPieceClickHandler>();
+            handler.manager = this;
+            handler.pieceIndex = index;
+        }
+
+        if (boardManager?.boardPieces != null)
+            boardManager.boardPieces[target.x, target.y] = queenPiece;
+
+        ShowPromotionPanel();
     }
 
     // Generic entrypoint: move whichever tutorial piece is active (rook preferred)

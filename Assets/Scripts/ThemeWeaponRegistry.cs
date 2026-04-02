@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
+/// Place this script on a GameObject in each Battle Chess scene.
 /// Assign the weapon prefab and transform settings in the Inspector.
 /// </summary>
 public class ThemeWeaponRegistry : MonoBehaviour
@@ -23,6 +24,10 @@ public class ThemeWeaponRegistry : MonoBehaviour
     public Vector3 enemyWeaponPosition = new Vector3(0f, 0f, 0.01f);
     public Vector3 enemyWeaponRotation = new Vector3(0f, 90f, 0f);
     public float   enemyWeaponScale    = 0.0015f;
+
+    [Header("Particles")]
+    public GameObject gunParticlePrefab;
+    public GameObject swordParticlePrefab;
 
     private void Awake()
     {

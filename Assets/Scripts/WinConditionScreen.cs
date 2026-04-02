@@ -1,27 +1,47 @@
-using System;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.UIElements;
+using Mirror;
+using System.Collections;
 
 public class WinConditionScreen : MonoBehaviour
 {
-    // Reloads the currently active scene
-    public void ReloadScene()
+    public void GoToLobby()
     {
-        Scene currentScene = SceneManager.GetActiveScene();
-        SceneManager.LoadScene(currentScene.name);
+        string scene = SceneManager.GetActiveScene().name;
+        string lobby = "ClassicLobby";
+        if      (scene.Contains("BattleChess"))       lobby = "BattleChessLobby";
+        else if (scene.Contains("HideTheKing"))        lobby = "HideTheKingLobby";
+        else if (scene.Contains("CrownOfConfussions")) lobby = "CrownOfConfusionsLobby";
+
+        StartCoroutine(StopAndLoad(lobby));
     }
 
-    // Exits the game
+    public void GoToMainMenu()
+    {
+        StartCoroutine(StopAndLoad("StartScene"));
+    }
+
+    private IEnumerator StopAndLoad(string sceneName)
+    {
+        if (NetworkServer.active && NetworkClient.isConnected)
+            NetworkManager.singleton.StopHost();
+        else if (NetworkServer.active)
+            NetworkManager.singleton.StopServer();
+        else if (NetworkClient.isConnected)
+            NetworkManager.singleton.StopClient();
+
+        // Wait for Mirror to fully stop
+        yield return new WaitForSeconds(0.5f);
+
+        SceneManager.LoadScene(sceneName);
+    }
+
     public void QuitGame()
     {
         Debug.Log("Game is exiting...");
-
         Application.Quit();
-
-        // Stops play mode in the Unity Editor
         #if UNITY_EDITOR
-            UnityEditor.EditorApplication.isPlaying = false;
+                UnityEditor.EditorApplication.isPlaying = false;
         #endif
     }
 }

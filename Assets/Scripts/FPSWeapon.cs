@@ -11,9 +11,7 @@ public class FPSWeapon : MonoBehaviour
     public float fireRate    = 1f;
     public float bulletRange = 50f;
 
-    // Optional particles
-    public ParticleSystem muzzleFlashParticle;
-    public ParticleSystem swingTrailParticle;
+
 
     private float   _nextFireTime  = 0f;
     private bool    _battleActive  = false;
@@ -59,6 +57,18 @@ public class FPSWeapon : MonoBehaviour
         Debug.Log("[FPSWeapon] Weapon attached to camera");
     }
 
+    private void PlayParticle(ParticleSystem[] unused)
+    {
+        ThemeWeaponRegistry reg = ThemeWeaponRegistry.Instance;
+        if (reg == null) return;
+        GameObject prefab = weaponType == WeaponType.Gun ? reg.gunParticlePrefab : reg.swordParticlePrefab;
+        if (prefab != null)
+        {
+            GameObject ps = Instantiate(prefab, fpsCamera.transform.position, fpsCamera.transform.rotation);
+            Destroy(ps, 3f);
+        }
+    }
+
     private void Update()
     {
         if (!_battleActive || fpsCamera == null) return;
@@ -79,12 +89,12 @@ public class FPSWeapon : MonoBehaviour
         if (weaponType == WeaponType.Gun)
         {
             Shoot();
-            if (muzzleFlashParticle != null) muzzleFlashParticle.Play();
+            PlayParticle(null);
         }
         else
         {
             Swing();
-            if (swingTrailParticle != null) swingTrailParticle.Play();
+            PlayParticle(null);
         }
     }
 

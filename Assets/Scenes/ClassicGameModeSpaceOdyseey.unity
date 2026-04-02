@@ -5615,10 +5615,10 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1101144873}
-        m_TargetAssemblyTypeName: MainMenu, Assembly-CSharp
-        m_MethodName: LoadSceneByName
-        m_Mode: 5
+      - m_Target: {fileID: 1101144874}
+        m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
+        m_MethodName: GoToMainMenu
+        m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
@@ -5763,10 +5763,10 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 686501444}
-        m_TargetAssemblyTypeName: MainMenu, Assembly-CSharp
-        m_MethodName: LoadSceneByName
-        m_Mode: 5
+      - m_Target: {fileID: 1101144874}
+        m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
+        m_MethodName: GoToMainMenu
+        m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
@@ -11429,10 +11429,10 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1101144873}
-        m_TargetAssemblyTypeName: MainMenu, Assembly-CSharp
-        m_MethodName: LoadSceneByName
-        m_Mode: 5
+      - m_Target: {fileID: 1101144874}
+        m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
+        m_MethodName: GoToLobby
+        m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
@@ -19701,10 +19701,10 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 686501444}
-        m_TargetAssemblyTypeName: MainMenu, Assembly-CSharp
-        m_MethodName: LoadSceneByName
-        m_Mode: 5
+      - m_Target: {fileID: 1101144874}
+        m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
+        m_MethodName: GoToLobby
+        m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
@@ -19826,6 +19826,73 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 842621286}
   m_CullTransparentMesh: 1
+--- !u!1 &846644354
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 846644357}
+  - component: {fileID: 846644356}
+  - component: {fileID: 846644355}
+  m_Layer: 0
+  m_Name: ChessTimer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &846644355
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 846644354}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: caec2081ed5884c49ba1805d028ca132, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  boardManager: {fileID: 1273940006}
+  timerWhiteText: {fileID: 876153322}
+  timerBlackText: {fileID: 1199846752}
+  whiteTimeRemaining: 0
+  blackTimeRemaining: 0
+--- !u!114 &846644356
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 846644354}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b91ecbcc199f4492b9a91e820070131, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  sceneId: 4173269665
+  _assetId: 0
+  serverOnly: 0
+  visibility: 0
+  hasSpawned: 0
+--- !u!4 &846644357
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 846644354}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 13.451725, y: 9.734331, z: -11.151923}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &873185512
 GameObject:
   m_ObjectHideFlags: 0
@@ -20844,7 +20911,6 @@ GameObject:
   - component: {fileID: 996436571}
   - component: {fileID: 996436573}
   - component: {fileID: 996436574}
-  - component: {fileID: 996436575}
   - component: {fileID: 996436576}
   - component: {fileID: 996436577}
   - component: {fileID: 996436578}
@@ -20914,23 +20980,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   boardManager: {fileID: 1273940006}
   moveHistory: []
---- !u!114 &996436575
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 996436570}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: caec2081ed5884c49ba1805d028ca132, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  boardManager: {fileID: 1273940006}
-  timerWhiteText: {fileID: 876153322}
-  timerBlackText: {fileID: 1199846752}
-  whiteTimeRemaining: 0
-  blackTimeRemaining: 0
 --- !u!114 &996436576
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -21656,10 +21705,10 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 502627491}
-        m_TargetAssemblyTypeName: MainMenu, Assembly-CSharp
-        m_MethodName: LoadSceneByName
-        m_Mode: 5
+      - m_Target: {fileID: 1101144874}
+        m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
+        m_MethodName: GoToMainMenu
+        m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
@@ -26849,10 +26898,10 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 502627491}
-        m_TargetAssemblyTypeName: MainMenu, Assembly-CSharp
-        m_MethodName: LoadSceneByName
-        m_Mode: 5
+      - m_Target: {fileID: 1101144874}
+        m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
+        m_MethodName: GoToLobby
+        m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
@@ -42641,6 +42690,7 @@ SceneRoots:
   - {fileID: 1101144878}
   - {fileID: 1557280571}
   - {fileID: 996436572}
+  - {fileID: 846644357}
   - {fileID: 1273940005}
   - {fileID: 460471112}
   - {fileID: 1549270925}

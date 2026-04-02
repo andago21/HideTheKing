@@ -64,7 +64,11 @@ public class ChessNetworkManager : NetworkBehaviour
         }
     }
 
-    private void DelayedStart() { RpcStartGame(); }
+    private void DelayedStart()
+    {
+        int minutes = PlayerPrefs.GetInt("SelectedTimerMinutes", 5);
+        RpcStartGame(minutes);
+    }
 
     public override void OnStopServer()
     {
@@ -74,8 +78,11 @@ public class ChessNetworkManager : NetworkBehaviour
     }
 
     [ClientRpc]
-    public void RpcStartGame()
+    public void RpcStartGame(int timerMinutes)
     {
+        PlayerPrefs.SetInt("SelectedTimerMinutes", timerMinutes);
+        PlayerPrefs.Save();
+
         BoardManager board = FindObjectOfType<BoardManager>();
         if (board != null) board.SetupBoard();
         ChessTimer timer = FindObjectOfType<ChessTimer>();

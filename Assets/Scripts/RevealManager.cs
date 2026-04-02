@@ -17,6 +17,7 @@ public class RevealManager : MonoBehaviour
     [Header("UI")]
     public GameObject panel;
     public TMP_Text   revealText;
+    public TMP_Text   subRevealText;
 
     [Header("Settings")]
     public float displayDuration = 5f;
@@ -75,7 +76,6 @@ public class RevealManager : MonoBehaviour
 
         Piece   hidden    = state.HiddenTarget;
         string  pieceName = hidden.type.ToString();
-        string  colorName = targetIsWhite ? "White" : "Black";
 
         // Add side specification from local player's perspective
         string sideInfo = "";
@@ -89,19 +89,15 @@ public class RevealManager : MonoBehaviour
             sideInfo = isLeft ? " (Left)" : " (Right)";
         }
 
-        string fullName = $"{colorName} {pieceName}{sideInfo}";
-
-        if (revealText != null)
+        if (subRevealText != null)
         {
-            revealText.text = isCrown
-                ? $"Your Opponent's Hidden King is...\n{fullName}!"
-                : $"Your Hidden King is...\n{fullName}!";
+            subRevealText.text = pieceName + sideInfo;
         }
 
         if (panel != null) panel.SetActive(true);
         IsRevealing = true;
 
-        Debug.Log($"[RevealManager] Showing king ({(isCrown ? "Opponent" : "Own")}): {fullName}");
+        Debug.Log($"[RevealManager] Showing king: {pieceName}{sideInfo}");
     }
 
     private void HideReveal()

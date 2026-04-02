@@ -270,7 +270,6 @@ public class PlayerInput : MonoBehaviour
             if (boardManager.gameState != GameState.Playing)
             {
                 ChessNetworkManager.LocalInstance.SendGameEnd(boardManager.gameState);
-                ChessNetworkManager.LocalInstance.SendEloSync(boardManager.gameState);
             }
         }
 

@@ -12,15 +12,12 @@ public class UIManager : MonoBehaviour
     public bool disableBoardOnEnd = true;
     
     private GameState _lastState = GameState.Playing;
+    private bool _eloGiven = false;
 
     void Start()
     {
         if (boardManager == null)
-        {
             boardManager = FindObjectOfType<BoardManager>();
-            if (boardManager == null)
-                Debug.LogWarning("UIManager: BoardManager not found in scene.");
-        }
 
         if (boardManager != null)
             _lastState = boardManager.gameState;
@@ -28,6 +25,8 @@ public class UIManager : MonoBehaviour
         if (victoryCanvas != null)  victoryCanvas.SetActive(false);
         if (drawCanvas != null)     drawCanvas.SetActive(false);
         if (gameOverCanvas != null) gameOverCanvas.SetActive(false);
+
+        _eloGiven = false;
     }
 
     void Update()
@@ -52,10 +51,20 @@ public class UIManager : MonoBehaviour
             boardManager.enabled = false;
 
         bool localIsWhite = GetLocalPlayerColor();
+        bool isMultiplayer = ChessNetworkManager.LocalInstance != null && 
+                             ChessNetworkManager.LocalInstance.IsMultiplayer();
+        bool isClassic = UnityEngine.SceneManagement.SceneManager
+                            .GetActiveScene().name.Contains("Classic");
 
         if (state == GameState.Draw)
         {
             if (drawCanvas != null) drawCanvas.SetActive(true);
+            if (isMultiplayer && isClassic && !_eloGiven)
+            {
+                _eloGiven = true;
+                if (EloManager.Instance != null)
+                    EloManager.Instance.UpdateElo(0.5f, 1200);
+            }
         }
         else if (state == GameState.WhiteWins)
         {
@@ -63,13 +72,23 @@ public class UIManager : MonoBehaviour
             {
                 if (victoryCanvas != null) victoryCanvas.SetActive(true);
                 if (MusicManager.Instance != null) MusicManager.Instance.PlayVictory();
-                Debug.Log("Victory screen shown (White won, you are White)");
+                if (isMultiplayer && isClassic && !_eloGiven)
+                {
+                    _eloGiven = true;
+                    if (EloManager.Instance != null)
+                        EloManager.Instance.UpdateElo(1f, 1200); // Gewinner +ELO
+                }
             }
             else
             {
                 if (gameOverCanvas != null) gameOverCanvas.SetActive(true);
                 if (MusicManager.Instance != null) MusicManager.Instance.PlayDefeat();
-                Debug.Log("Game Over screen shown (White won, you are Black)");
+                if (isMultiplayer && isClassic && !_eloGiven)
+                {
+                    _eloGiven = true;
+                    if (EloManager.Instance != null)
+                        EloManager.Instance.UpdateElo(0f, 1200); // Verlierer -ELO
+                }
             }
         }
         else if (state == GameState.BlackWins)
@@ -78,13 +97,23 @@ public class UIManager : MonoBehaviour
             {
                 if (victoryCanvas != null) victoryCanvas.SetActive(true);
                 if (MusicManager.Instance != null) MusicManager.Instance.PlayVictory();
-                Debug.Log("Victory screen shown (Black won, you are Black)");
+                if (isMultiplayer && isClassic && !_eloGiven)
+                {
+                    _eloGiven = true;
+                    if (EloManager.Instance != null)
+                        EloManager.Instance.UpdateElo(1f, 1200); // Gewinner +ELO
+                }
             }
             else
             {
                 if (gameOverCanvas != null) gameOverCanvas.SetActive(true);
                 if (MusicManager.Instance != null) MusicManager.Instance.PlayDefeat();
-                Debug.Log("Game Over screen shown (Black won, you are White)");
+                if (isMultiplayer && isClassic && !_eloGiven)
+                {
+                    _eloGiven = true;
+                    if (EloManager.Instance != null)
+                        EloManager.Instance.UpdateElo(0f, 1200); // Verlierer -ELO
+                }
             }
         }
     }
@@ -96,6 +125,13 @@ public class UIManager : MonoBehaviour
             bool isWhite = ChessNetworkManager.LocalInstance.isWhitePlayer;
             Debug.Log("UIManager: Local player is " + (isWhite ? "White" : "Black"));
             return isWhite;
+        }
+
+        // Singleplayer — kein Netzwerk, Spieler ist immer Weiss
+        if (!Mirror.NetworkClient.active && !Mirror.NetworkServer.active)
+        {
+            Debug.Log("UIManager: Singleplayer — defaulting to White");
+            return true;
         }
 
         Debug.Log("UIManager: Using static LocalIsWhite = " + ChessNetworkManager.LocalIsWhite);

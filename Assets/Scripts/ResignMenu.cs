@@ -27,17 +27,21 @@ public class ResignMenu : MonoBehaviour
     {
         Debug.Log("[Resign] Player resigned!");
 
-        ChessNetworkManager net = ChessNetworkManager.LocalInstance;
         BoardManager board = FindObjectOfType<BoardManager>();
+        if (board == null || board.gameState != GameState.Playing) return;
 
-        if (net != null && net.IsMultiplayer() && board != null && board.gameState == GameState.Playing)
+        ChessNetworkManager net = ChessNetworkManager.LocalInstance;
+
+        if (net != null && net.IsMultiplayer())
         {
-            // Resignierender verliert
+            // Multiplayer — Resignierender verliert
             GameState result = net.isWhitePlayer ? GameState.BlackWins : GameState.WhiteWins;
-
-            // SendEloSync VOR SendGameEnd — damit PlayerInput.Update nicht nochmal ELO gibt
-            net.SendEloSync(result);
             net.SendGameEnd(result);
+        }
+        else
+        {
+            // Singleplayer / AI — Spieler ist immer Weiss, verliert
+            board.HandleGameEnd(GameState.BlackWins);
         }
 
         if (resignMenuCanvas != null)

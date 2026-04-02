@@ -1,9 +1,14 @@
 using UnityEngine;
+using TMPro;
 
 public class ChessTimer : MonoBehaviour
 {
     public BoardManager boardManager;
     private GameRules gameRules;
+
+    [Header("UI")]
+    public TMP_Text timerWhiteText;
+    public TMP_Text timerBlackText;
 
     public float whiteTimeRemaining;
     public float blackTimeRemaining;
@@ -23,33 +28,35 @@ public class ChessTimer : MonoBehaviour
 
     private void Start()
     {
-        // CHANGED: no longer auto-starts. 
-        // In singleplayer, StartTimer() is called immediately.
-        // In multiplayer, StartTimer() is called once both players are connected.
         if (!Mirror.NetworkClient.active && !Mirror.NetworkServer.active)
         {
-            StartTimer(); // Singleplayer: start immediately
+            StartTimer();
         }
-        // Multiplayer: LobbyConnector will call StartTimer() via RPC when both players are in
     }
 
     public void StartTimer()
     {
-        int randomMinutes = Random.Range(0, 2) == 0 ? 5 : 10;
-        gameDuration = randomMinutes * 60f;
+        // Read timer from PlayerPrefs (set by Host in LobbyUI)
+        // Default 5 minutes if not set
+        int minutes = PlayerPrefs.GetInt("SelectedTimerMinutes", 5);
+        gameDuration = minutes * 60f;
 
         whiteTimeRemaining = gameDuration;
         blackTimeRemaining = gameDuration;
 
         timerActive = true;
 
-        Debug.Log("Chess Timer started: " + randomMinutes + " minutes per player");
+        Debug.Log("Chess Timer started: " + minutes + " minutes per player");
     }
 
     private void Update()
     {
         if (!timerActive || boardManager.gameState != GameState.Playing)
             return;
+
+        // Update UI
+        if (timerWhiteText != null) timerWhiteText.text = GetFormattedTime(true);
+        if (timerBlackText != null) timerBlackText.text = GetFormattedTime(false);
 
         if (Time.time >= nextDisplayTime)
         {

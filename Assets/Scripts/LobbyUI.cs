@@ -6,13 +6,29 @@ using UnityEngine.SceneManagement;
 
 public class LobbyUI : MonoBehaviour
 {
-    [Header("UI References")]
+    [Header("Connection UI")]
     public Button hostButton;
     public Button joinButton;
     public TMP_InputField ipInputField;
     public TMP_Text waitingForPlayersText;
-    public TMP_Text gameModeText;
     public TMP_Text errorText;
+
+    [Header("Theme Buttons (Host only)")]
+    public Button piratesButton;
+    public Button medievalButton;
+    public Button cyberpunkButton;
+    public Button spaceButton;
+    public Button wildButton;
+    public Button timeButton;
+
+    [Header("Timer Buttons (Host only)")]
+    public Button fiveMinButton;
+    public Button tenMinButton;
+    public Button fifteenMinButton;
+
+    [Header("Arrow Followers")]
+    public GameObject themeArrow;
+    public GameObject timerArrow;
 
     private const ushort PORT_CLASSIC         = 7777;
     private const ushort PORT_BATTLE_CHESS    = 7778;
@@ -20,44 +36,48 @@ public class LobbyUI : MonoBehaviour
     private const ushort PORT_CROWN_CONFUSION = 7780;
 
     private static readonly string[] CLASSIC_SCENES = {
-        "ClassicGameModeCyberPunk",
-        "ClassicGameModeMedivalBattle",
         "ClassicGameModePirates",
+        "ClassicGameModeMedivalBattle",
+        "ClassicGameModeCyberPunk",
         "ClassicGameModeSpaceOdyseey",
-        "ClassicGameModeTimeTravel",
-        "ClassicGameModeWildWest"
+        "ClassicGameModeWildWest",
+        "ClassicGameModeTimeTravel"
     };
 
     private static readonly string[] BATTLE_SCENES = {
-        "BattleChessGameModeCyberPunk",
-        "BattleChessGameModeMedivalBattle",
         "BattleChessGameModePirates",
+        "BattleChessGameModeMedivalBattle",
+        "BattleChessGameModeCyberPunk",
         "BattleChessGameModeSpaceOdyseey",
-        "BattleChessGameModeTimeTravel",
-        "BattleChessGameModeWildWest"
+        "BattleChessGameModeWildWest",
+        "BattleChessGameModeTimeTravel"
     };
 
-     private static readonly string[] HIDE_THE_KING_SCENES = {
-        "HideTheKingGameModeCyberPunk",
-        "HideTheKingGameModeMedivalBattle",
+    private static readonly string[] HIDE_THE_KING_SCENES = {
         "HideTheKingGameModePirates",
+        "HideTheKingGameModeMedivalBattle",
+        "HideTheKingGameModeCyberPunk",
         "HideTheKingGameModeSpaceOdyseey",
-        "HideTheKingGameModeTimeTravel",
-        "HideTheKingGameModeWildWest"
+        "HideTheKingGameModeWildWest",
+        "HideTheKingGameModeTimeTravel"
     };
- 
+
     private static readonly string[] CROWN_CONFUSION_SCENES = {
-        "CrownOfConfussionsGameModeCyberPunk",
-        "CrownOfConfussionsGameModeMedivalBattle",
         "CrownOfConfussionsGameModePirates",
+        "CrownOfConfussionsGameModeMedivalBattle",
+        "CrownOfConfussionsGameModeCyberPunk",
         "CrownOfConfussionsGameModeSpaceOdyseey",
-        "CrownOfConfussionsGameModeTimeTravel",
-        "CrownOfConfussionsGameModeWildWest"
+        "CrownOfConfussionsGameModeWildWest",
+        "CrownOfConfussionsGameModeTimeTravel"
     };
 
     private ushort   _currentPort;
     private string   _currentModeName;
     private string[] _scenePool;
+
+    // Selected by host
+    private int _selectedThemeIndex = 0; // 0=Pirates, 1=Medieval, 2=Cyberpunk, 3=Space, 4=Wild, 5=Time
+    private int _selectedTimerMinutes = 5;
 
     private void Start()
     {
@@ -90,17 +110,56 @@ public class LobbyUI : MonoBehaviour
 
         SetTransportPort(_currentPort);
 
-        if (gameModeText != null)
-            gameModeText.text = $"Mode: {_currentModeName}";
+        if (errorText != null)         errorText.gameObject.SetActive(false);
+        if (waitingForPlayersText != null) waitingForPlayersText.gameObject.SetActive(false);
 
-        if (errorText != null)
-            errorText.gameObject.SetActive(false);
+        // Theme buttons
+        if (piratesButton  != null) piratesButton.onClick.AddListener(()  => SelectTheme(0, piratesButton));
+        if (medievalButton != null) medievalButton.onClick.AddListener(() => SelectTheme(1, medievalButton));
+        if (cyberpunkButton!= null) cyberpunkButton.onClick.AddListener(()=> SelectTheme(2, cyberpunkButton));
+        if (spaceButton    != null) spaceButton.onClick.AddListener(()    => SelectTheme(3, spaceButton));
+        if (wildButton     != null) wildButton.onClick.AddListener(()     => SelectTheme(4, wildButton));
+        if (timeButton     != null) timeButton.onClick.AddListener(()     => SelectTheme(5, timeButton));
 
-        if (waitingForPlayersText != null)
-            waitingForPlayersText.gameObject.SetActive(false);
+        // Timer buttons
+        if (fiveMinButton   != null) fiveMinButton.onClick.AddListener(()   => SelectTimer(5,  fiveMinButton));
+        if (tenMinButton    != null) tenMinButton.onClick.AddListener(()    => SelectTimer(10, tenMinButton));
+        if (fifteenMinButton!= null) fifteenMinButton.onClick.AddListener(()=> SelectTimer(15, fifteenMinButton));
 
+        // Connection buttons
         hostButton.onClick.AddListener(OnHostClicked);
         joinButton.onClick.AddListener(OnJoinClicked);
+
+        // Default selection
+        SelectTheme(0, piratesButton);
+        SelectTimer(5, fiveMinButton);
+    }
+
+    private Button _selectedThemeButton;
+    private Button _selectedTimerButton;
+
+    private void SelectTheme(int index, Button btn)
+    {
+        _selectedThemeIndex = index;
+        Debug.Log($"[LobbyUI] Theme selected: index={index} scene={_scenePool[index]}");
+        if (themeArrow != null && btn != null)
+            themeArrow.transform.position = new Vector3(
+                themeArrow.transform.position.x,
+                btn.transform.position.y,
+                themeArrow.transform.position.z);
+        _selectedThemeButton = btn;
+    }
+
+    private void SelectTimer(int minutes, Button btn)
+    {
+        _selectedTimerMinutes = minutes;
+        Debug.Log($"[LobbyUI] Timer selected: {minutes} minutes");
+        if (timerArrow != null && btn != null)
+            timerArrow.transform.position = new Vector3(
+                timerArrow.transform.position.x,
+                btn.transform.position.y,
+                timerArrow.transform.position.z);
+        _selectedTimerButton = btn;
     }
 
     private void SetTransportPort(ushort port)
@@ -115,10 +174,18 @@ public class LobbyUI : MonoBehaviour
 
     private void OnHostClicked()
     {
-        string randomScene = _scenePool[Random.Range(0, _scenePool.Length)];
-        NetworkManager.singleton.onlineScene = randomScene;
+        // Use selected theme
+        string selectedScene = _scenePool[_selectedThemeIndex];
+        NetworkManager.singleton.onlineScene = selectedScene;
 
-        Debug.Log($"[LobbyUI] Host starts {_currentModeName} with Scene: {randomScene}");
+        // Save timer setting
+        PlayerPrefs.SetInt("SelectedTimerMinutes", _selectedTimerMinutes);
+        PlayerPrefs.Save();
+
+        Debug.Log($"[LobbyUI] Host starts {_currentModeName}");
+        Debug.Log($"[LobbyUI] Selected theme index: {_selectedThemeIndex}");
+        Debug.Log($"[LobbyUI] Selected scene: {selectedScene}");
+        Debug.Log($"[LobbyUI] Selected timer: {_selectedTimerMinutes} minutes");
 
         SetTransportPort(_currentPort);
         NetworkManager.singleton.StartHost();
@@ -126,6 +193,9 @@ public class LobbyUI : MonoBehaviour
         hostButton.gameObject.SetActive(false);
         joinButton.gameObject.SetActive(false);
         ipInputField.gameObject.SetActive(false);
+
+        // Hide theme/timer options
+        SetThemeTimerVisible(false);
 
         if (waitingForPlayersText != null)
             waitingForPlayersText.gameObject.SetActive(true);
@@ -142,9 +212,11 @@ public class LobbyUI : MonoBehaviour
         NetworkManager.singleton.networkAddress = ip;
         NetworkManager.singleton.StartClient();
 
-        // Auf Verbindung warten — nach 5 Sekunden prüfen ob erfolgreich
         hostButton.interactable = false;
         joinButton.interactable = false;
+
+        // Hide theme/timer — client doesn't choose
+        SetThemeTimerVisible(false);
 
         if (errorText != null)
             errorText.gameObject.SetActive(false);
@@ -154,6 +226,18 @@ public class LobbyUI : MonoBehaviour
         StartCoroutine(CheckConnectionTimeout(ip));
     }
 
+    private void SetThemeTimerVisible(bool visible)
+    {
+        Button[] themeButtons = { piratesButton, medievalButton, cyberpunkButton, spaceButton, wildButton, timeButton };
+        Button[] timerButtons = { fiveMinButton, tenMinButton, fifteenMinButton };
+
+        foreach (var b in themeButtons) if (b != null) b.gameObject.SetActive(visible);
+        foreach (var b in timerButtons) if (b != null) b.gameObject.SetActive(visible);
+
+        if (themeArrow != null) themeArrow.SetActive(visible);
+        if (timerArrow != null) timerArrow.SetActive(visible);
+    }
+
     private System.Collections.IEnumerator CheckConnectionTimeout(string ip)
     {
         float timeout = 5f;
@@ -161,7 +245,6 @@ public class LobbyUI : MonoBehaviour
 
         while (elapsed < timeout)
         {
-            // Verbindung erfolgreich
             if (Mirror.NetworkClient.isConnected)
             {
                 Debug.Log("[LobbyUI] Connection successful");
@@ -171,7 +254,6 @@ public class LobbyUI : MonoBehaviour
             yield return null;
         }
 
-        // Timeout — kein Server gefunden
         if (!Mirror.NetworkClient.isConnected)
         {
             Debug.Log("[LobbyUI] No Server found");
@@ -179,6 +261,9 @@ public class LobbyUI : MonoBehaviour
 
             hostButton.interactable = true;
             joinButton.interactable = true;
+
+            // Show theme/timer again
+            SetThemeTimerVisible(true);
 
             if (errorText != null)
             {

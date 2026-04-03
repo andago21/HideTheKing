@@ -25,6 +25,8 @@ public class BattleChessManager : NetworkBehaviour
 
     private List<GameObject> _hiddenObjects      = new List<GameObject>();
     private GameObject       _localFPSBody        = null;
+    private float            _attackerOriginalY   = 0f;
+    private float            _defenderOriginalY   = 0f;
     private GameObject       _spawnedFigureWeapon = null;
 
     private void Awake()
@@ -93,6 +95,8 @@ public class BattleChessManager : NetworkBehaviour
 
         Piece attacker = board.boardPieces[ax, ay];
         Piece defender = board.boardPieces[dx, dy];
+        if (attacker != null) _attackerOriginalY = attacker.transform.position.y;
+        if (defender != null) _defenderOriginalY = defender.transform.position.y;
         if (attacker == null || defender == null) return;
 
         // 1. Kamera speichern
@@ -431,7 +435,7 @@ public class BattleChessManager : NetworkBehaviour
             camCtrl.RestoreFromFPS();
             // Restore default near clip plane
             Camera mainCam = camCtrl.GetMainCamera();
-            if (mainCam != null) mainCam.nearClipPlane = 3f;
+            if (mainCam != null) mainCam.nearClipPlane = 0.3f;
         }
 
         // 5. Schachbrett-Ergebnis anwenden
@@ -451,10 +455,10 @@ public class BattleChessManager : NetworkBehaviour
                     board.boardPieces[dx, dy] = attacker;
                     attacker.position         = newPos;
                     attacker.hasMoved         = true;
-                    // Snap zur korrekten Brett-Position — FPSBody hat sie verschoben
-                    Vector3 correctPos = board.squares[dx * 8 + dy].position;
-                    correctPos.y = attacker.transform.position.y;
-                    attacker.transform.position = correctPos;
+                    // Use the square's exact position, only keep the piece's own Y offset
+                    Vector3 squarePos = board.squares[dx * 8 + dy].position;
+                    squarePos.y = _attackerOriginalY;
+                    attacker.transform.position = squarePos;
                 }
                 Debug.Log("[BattleChess] Attacker won");
             }
@@ -465,12 +469,12 @@ public class BattleChessManager : NetworkBehaviour
                     board.boardPieces[ax, ay] = null;
                     board.SendToSide(attacker);
                 }
-                // Defender bleibt auf seinem Feld — snap zur korrekten Position
+                // Defender stays on its field — snap to exact square position
                 if (defender != null)
                 {
-                    Vector3 correctPos = board.squares[dx * 8 + dy].position;
-                    correctPos.y = defender.transform.position.y;
-                    defender.transform.position = correctPos;
+                    Vector3 squarePos = board.squares[dx * 8 + dy].position;
+                    squarePos.y = _defenderOriginalY;
+                    defender.transform.position = squarePos;
                 }
                 Debug.Log("[BattleChess] Defender won");
             }

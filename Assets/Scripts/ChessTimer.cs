@@ -1,62 +1,77 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using TMPro;
+using Mirror;
 
-public class ChessTimer : MonoBehaviour
+public class ChessTimer : NetworkBehaviour
 {
     public BoardManager boardManager;
-    private GameRules gameRules;
 
     [Header("UI")]
     public TMP_Text timerWhiteText;
     public TMP_Text timerBlackText;
 
-    public float whiteTimeRemaining;
-    public float blackTimeRemaining;
-    
-    private float gameDuration;
-    private bool timerActive = false;
+    [SyncVar] public float whiteTimeRemaining;
+    [SyncVar] public float blackTimeRemaining;
 
+    private bool timerActive = false;
     private float displayInterval = 5f;
     private float nextDisplayTime = 0f;
 
+    private bool IsOffline => SceneManager.GetActiveScene().name.Contains("Offline");
+
     private void Awake()
     {
-        gameRules = GetComponent<GameRules>();
-        if (gameRules == null)
-            Debug.LogError("GameRules component not found on BoardManager!");
+        if (boardManager == null)
+            boardManager = FindObjectOfType<BoardManager>();
     }
 
     private void Start()
     {
-        if (!Mirror.NetworkClient.active && !Mirror.NetworkServer.active)
-        {
+        if (IsOffline)
             StartTimer();
-        }
+        else if (!NetworkClient.active && !NetworkServer.active)
+            StartTimer();
     }
 
     public void StartTimer()
     {
-        // Read timer from PlayerPrefs (set by Host in LobbyUI)
-        // Default 5 minutes if not set
-        int minutes = PlayerPrefs.GetInt("SelectedTimerMinutes", 5);
-        gameDuration = minutes * 60f;
+        int minutes;
 
-        whiteTimeRemaining = gameDuration;
-        blackTimeRemaining = gameDuration;
+        if (IsOffline)
+        {
+            // Random 5, 10 or 15 minutes for offline/AI games
+            int[] options = { 5, 10, 15 };
+            minutes = options[Random.Range(0, options.Length)];
+        }
+        else
+        {
+            // Multiplayer: use host's selection from LobbyUI
+            minutes = PlayerPrefs.GetInt("SelectedTimerMinutes", 5);
+        }
 
+        whiteTimeRemaining = minutes * 60f;
+        blackTimeRemaining = minutes * 60f;
         timerActive = true;
 
-        Debug.Log("Chess Timer started: " + minutes + " minutes per player");
+        Debug.Log("[Timer] Scene: " + SceneManager.GetActiveScene().name + " | IsOffline: " + IsOffline + " | Minutes: " + minutes);
     }
 
     private void Update()
     {
-        if (!timerActive || boardManager.gameState != GameState.Playing)
+        if (boardManager == null)
+        {
+            boardManager = FindObjectOfType<BoardManager>();
             return;
+        }
 
-        // Update UI
+        // Update UI on all clients (SyncVar keeps values in sync for multiplayer)
         if (timerWhiteText != null) timerWhiteText.text = GetFormattedTime(true);
         if (timerBlackText != null) timerBlackText.text = GetFormattedTime(false);
+
+        // Offline: run locally; Multiplayer: only server runs the logic
+        if (!IsOffline && !isServer) return;
+        if (!timerActive || boardManager.gameState != GameState.Playing) return;
 
         if (Time.time >= nextDisplayTime)
         {
@@ -67,55 +82,39 @@ public class ChessTimer : MonoBehaviour
         if (boardManager.isWhiteTurn)
         {
             whiteTimeRemaining -= Time.deltaTime;
-            if (whiteTimeRemaining <= 0)
-            {
-                whiteTimeRemaining = 0;
-                OnTimeOut(true);
-            }
+            if (whiteTimeRemaining <= 0) { whiteTimeRemaining = 0; OnTimeOut(true); }
         }
         else
         {
             blackTimeRemaining -= Time.deltaTime;
-            if (blackTimeRemaining <= 0)
-            {
-                blackTimeRemaining = 0;
-                OnTimeOut(false);
-            }
+            if (blackTimeRemaining <= 0) { blackTimeRemaining = 0; OnTimeOut(false); }
         }
     }
 
     private void OnTimeOut(bool isWhiteTimeout)
     {
         timerActive = false;
-
-        if (isWhiteTimeout)
+        if (IsOffline || isServer)
         {
-            Debug.Log("White ran out of time! Black wins by timeout.");
-            boardManager.gameState = GameState.BlackWins;
-        }
-        else
-        {
-            Debug.Log("Black ran out of time! White wins by timeout.");
-            boardManager.gameState = GameState.WhiteWins;
+            if (isWhiteTimeout)
+            {
+                Debug.Log("White ran out of time! Black wins by timeout.");
+                boardManager.HandleGameEnd(GameState.BlackWins);
+            }
+            else
+            {
+                Debug.Log("Black ran out of time! White wins by timeout.");
+                boardManager.HandleGameEnd(GameState.WhiteWins);
+            }
         }
     }
 
     public string GetFormattedTime(bool isWhite)
     {
-        float timeRemaining = isWhite ? whiteTimeRemaining : blackTimeRemaining;
-        int minutes = Mathf.FloorToInt(timeRemaining / 60);
-        int seconds = Mathf.FloorToInt(timeRemaining % 60);
-        return string.Format("{0:00}:{1:00}", minutes, seconds);
+        float t = isWhite ? whiteTimeRemaining : blackTimeRemaining;
+        return string.Format("{0:00}:{1:00}", Mathf.FloorToInt(t / 60), Mathf.FloorToInt(t % 60));
     }
 
-    public void StopTimer()
-    {
-        timerActive = false;
-    }
-
-    public void ResumeTimer()
-    {
-        if (boardManager.gameState == GameState.Playing)
-            timerActive = true;
-    }
+    public void StopTimer()   { timerActive = false; }
+    public void ResumeTimer() { if (boardManager != null && boardManager.gameState == GameState.Playing) timerActive = true; }
 }

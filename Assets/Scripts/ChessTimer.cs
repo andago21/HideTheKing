@@ -17,6 +17,8 @@ public class ChessTimer : NetworkBehaviour
     private bool timerActive = false;
     private float displayInterval = 5f;
     private float nextDisplayTime = 0f;
+    private float _uiUpdateInterval = 0.25f; // Update UI only 4x per second
+    private float _nextUIUpdate = 0f;
 
     private bool IsOffline => SceneManager.GetActiveScene().name.Contains("Offline");
 
@@ -65,9 +67,13 @@ public class ChessTimer : NetworkBehaviour
             return;
         }
 
-        // Update UI on all clients (SyncVar keeps values in sync for multiplayer)
-        if (timerWhiteText != null) timerWhiteText.text = GetFormattedTime(true);
-        if (timerBlackText != null) timerBlackText.text = GetFormattedTime(false);
+        // Update UI only 4x per second to save CPU
+        if (Time.time >= _nextUIUpdate)
+        {
+            _nextUIUpdate = Time.time + _uiUpdateInterval;
+            if (timerWhiteText != null) timerWhiteText.text = GetFormattedTime(true);
+            if (timerBlackText != null) timerBlackText.text = GetFormattedTime(false);
+        }
 
         // Offline: run locally; Multiplayer: only server runs the logic
         if (!IsOffline && !isServer) return;

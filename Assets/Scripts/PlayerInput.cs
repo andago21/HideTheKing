@@ -15,6 +15,8 @@ public class PlayerInput : MonoBehaviour
     private GameRules gameRules;
     private MoveNotation moveNotation;
 
+    private AIOpponent _aiOpponent;
+
     void Start()
     {
         gameRules = GetComponent<GameRules>();
@@ -24,6 +26,8 @@ public class PlayerInput : MonoBehaviour
         moveNotation = GetComponent<MoveNotation>();
         if (moveNotation == null)
             Debug.LogError("MoveNotation component not found on BoardManager!");
+
+        _aiOpponent = FindObjectOfType<AIOpponent>();
     }
 
     void Update()
@@ -35,7 +39,11 @@ public class PlayerInput : MonoBehaviour
         // Keine Züge während HideTheKing Reveal
         if (RevealManager.IsRevealing) return;
 
-        if (ChessNetworkManager.LocalInstance != null)
+        // In singleplayer: block input while it is AI's turn
+        if (_aiOpponent != null && _aiOpponent.aiEnabled && _aiOpponent.IsAITurn()) return;
+
+        if (ChessNetworkManager.LocalInstance != null &&
+            ChessNetworkManager.LocalInstance.IsMultiplayer())
             if (!ChessNetworkManager.LocalInstance.IsMyTurn()) return;
 
         if (Input.GetMouseButtonDown(0))

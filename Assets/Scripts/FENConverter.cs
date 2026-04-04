@@ -4,7 +4,6 @@ public class FENConverter : MonoBehaviour
 {
     public static FENConverter Instance;
 
-    // Cache references (set in Awake or via inspector)
     private BoardManager boardManager;
     private GameRules gameRules;
     private MoveNotation moveNotation;
@@ -14,92 +13,84 @@ public class FENConverter : MonoBehaviour
         if (Instance == null)
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject); // optional
+            DontDestroyOnLoad(gameObject);
         }
         else if (Instance != this)
         {
             Destroy(gameObject);
             return;
         }
+        RefreshReferences();
+    }
 
-        // Try to find dependencies automatically
+    private void OnEnable()
+    {
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    private void OnDisable()
+    {
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    private void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene,
+                               UnityEngine.SceneManagement.LoadSceneMode mode)
+    {
+        // Refresh all references after every scene load
+        RefreshReferences();
+    }
+
+    private void RefreshReferences()
+    {
         boardManager = FindObjectOfType<BoardManager>();
         gameRules    = FindObjectOfType<GameRules>();
         moveNotation = FindObjectOfType<MoveNotation>();
-
-        if (boardManager == null)   Debug.LogError("FENConverter could not find BoardManager!");
-        if (gameRules == null)      Debug.LogError("FENConverter could not find GameRules!");
-        if (moveNotation == null)   Debug.LogWarning("FENConverter could not find MoveNotation – fullmove number will be approximate.");
     }
 
-    /// <summary>
-    /// Converts the current board state to standard FEN notation
-    /// </summary>
     public string BoardToFEN()
     {
+        // Re-find if lost (e.g. scene reload)
+        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
+        if (gameRules == null)    gameRules    = FindObjectOfType<GameRules>();
+        if (moveNotation == null) moveNotation = FindObjectOfType<MoveNotation>();
+
         if (boardManager == null)
         {
-            Debug.LogError("BoardManager reference missing – cannot generate FEN.");
-            return "8/8/8/8/8/8/8/8 w - - 0 1"; // fallback / error representation
+            Debug.LogError("BoardManager reference missing - cannot generate FEN.");
+            return "8/8/8/8/8/8/8/8 w - - 0 1";
         }
 
         string fen = "";
 
-        // 1. Piece placement (rank 8 → rank 1)
         for (int row = 7; row >= 0; row--)
         {
             int emptyCount = 0;
-
             for (int col = 0; col < 8; col++)
             {
                 Piece piece = boardManager.boardPieces[row, col];
-
-                if (piece == null)
-                {
-                    emptyCount++;
-                }
+                if (piece == null) { emptyCount++; }
                 else
                 {
-                    if (emptyCount > 0)
-                    {
-                        fen += emptyCount;
-                        emptyCount = 0;
-                    }
+                    if (emptyCount > 0) { fen += emptyCount; emptyCount = 0; }
                     fen += GetFENPieceChar(piece);
                 }
             }
-
-            if (emptyCount > 0)
-                fen += emptyCount;
-
-            if (row > 0)
-                fen += "/";
+            if (emptyCount > 0) fen += emptyCount;
+            if (row > 0) fen += "/";
         }
 
-        // 2. Active color
         fen += " " + (boardManager.isWhiteTurn ? "w" : "b");
 
-        // 3. Castling availability
         string castling = GetCastlingRights();
         fen += " " + (string.IsNullOrEmpty(castling) ? "-" : castling);
-
-        // 4. En passant target square
         fen += " " + GetEnPassantSquare();
 
-        // 5. Halfmove clock (plies since last pawn move or capture)
         int halfMoveClock = gameRules != null ? gameRules.halfMoveClock : 0;
         fen += " " + halfMoveClock;
 
-        // 6. Fullmove number
         int fullMoveNumber = 1;
-
         if (moveNotation != null && moveNotation.moveHistory != null)
-        {
-            // Rough approximation: every two moves (white+black) = one fullmove
             fullMoveNumber = (moveNotation.moveHistory.Count / 2) + 1;
-        }
-        // TODO: for better accuracy, maintain a fullMoveCounter in GameRules and increment it only after black's move
-
         fen += " " + fullMoveNumber;
 
         return fen;
@@ -117,36 +108,25 @@ public class FENConverter : MonoBehaviour
             PieceType.King   => 'k',
             _                => '?'
         };
-
         return piece.isWhite ? char.ToUpper(c) : c;
     }
 
     private string GetCastlingRights()
     {
         if (boardManager == null) return "";
-
         string rights = "";
-
-        // White
         Piece wKing = boardManager.boardPieces[0, 4];
         if (wKing != null && !wKing.hasMoved)
         {
-            if (boardManager.boardPieces[0, 7] is { } wKRook && !wKRook.hasMoved)
-                rights += "K";
-            if (boardManager.boardPieces[0, 0] is { } wQRook && !wQRook.hasMoved)
-                rights += "Q";
+            if (boardManager.boardPieces[0, 7] is { } wKRook && !wKRook.hasMoved) rights += "K";
+            if (boardManager.boardPieces[0, 0] is { } wQRook && !wQRook.hasMoved) rights += "Q";
         }
-
-        // Black
         Piece bKing = boardManager.boardPieces[7, 4];
         if (bKing != null && !bKing.hasMoved)
         {
-            if (boardManager.boardPieces[7, 7] is { } bKRook && !bKRook.hasMoved)
-                rights += "k";
-            if (boardManager.boardPieces[7, 0] is { } bQRook && !bQRook.hasMoved)
-                rights += "q";
+            if (boardManager.boardPieces[7, 7] is { } bKRook && !bKRook.hasMoved) rights += "k";
+            if (boardManager.boardPieces[7, 0] is { } bQRook && !bQRook.hasMoved) rights += "q";
         }
-
         return rights;
     }
 
@@ -155,18 +135,12 @@ public class FENConverter : MonoBehaviour
         if (boardManager == null ||
             boardManager.enPassantTarget.x < 0 ||
             boardManager.enPassantTarget.y < 0)
-        {
             return "-";
-        }
-
         char file = (char)('a' + boardManager.enPassantTarget.y);
         int rank = boardManager.enPassantTarget.x + 1;
         return $"{file}{rank}";
     }
 
-    /// <summary>
-    /// Converts UCI move string (e.g. "e2e4", "b7b8q") → from/to positions
-    /// </summary>
     public (Vector2Int from, Vector2Int to) UCIToPosition(string uci)
     {
         if (string.IsNullOrEmpty(uci) || uci.Length < 4)
@@ -174,15 +148,10 @@ public class FENConverter : MonoBehaviour
             Debug.LogError($"Invalid UCI move: '{uci}'");
             return (new Vector2Int(-1,-1), new Vector2Int(-1,-1));
         }
-
         int fromFile = uci[0] - 'a';
-        int fromRank = uci[1] - '1';   // '1' → 0
+        int fromRank = uci[1] - '1';
         int toFile   = uci[2] - 'a';
         int toRank   = uci[3] - '1';
-
-        return (
-            new Vector2Int(fromRank, fromFile),
-            new Vector2Int(toRank,   toFile)
-        );
+        return (new Vector2Int(fromRank, fromFile), new Vector2Int(toRank, toFile));
     }
 }

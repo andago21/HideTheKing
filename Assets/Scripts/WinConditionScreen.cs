@@ -12,6 +12,7 @@ public class WinConditionScreen : MonoBehaviour
         if      (scene.Contains("BattleChess"))       lobby = "BattleChessLobby";
         else if (scene.Contains("HideTheKing"))        lobby = "HideTheKingLobby";
         else if (scene.Contains("CrownOfConfussions")) lobby = "CrownOfConfusionsLobby";
+        else if (scene.Contains("Offline")) lobby = "ClassicOfflineLobby";
 
         StartCoroutine(StopAndLoad(lobby));
     }

@@ -5763,7 +5763,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1101144874}
+      - m_Target: {fileID: 686501445}
         m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
         m_MethodName: GoToMainMenu
         m_Mode: 1
@@ -19701,7 +19701,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1101144874}
+      - m_Target: {fileID: 686501445}
         m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
         m_MethodName: GoToLobby
         m_Mode: 1
@@ -19856,6 +19856,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: caec2081ed5884c49ba1805d028ca132, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   boardManager: {fileID: 1273940006}
   timerWhiteText: {fileID: 876153322}
   timerBlackText: {fileID: 1199846752}
@@ -21705,7 +21708,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1101144874}
+      - m_Target: {fileID: 502627492}
         m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
         m_MethodName: GoToMainMenu
         m_Mode: 1
@@ -26898,7 +26901,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1101144874}
+      - m_Target: {fileID: 502627492}
         m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
         m_MethodName: GoToLobby
         m_Mode: 1

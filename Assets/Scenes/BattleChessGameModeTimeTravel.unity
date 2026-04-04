@@ -537,6 +537,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: caec2081ed5884c49ba1805d028ca132, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   boardManager: {fileID: 1273940006}
   timerWhiteText: {fileID: 1793875864}
   timerBlackText: {fileID: 1553302425}
@@ -20559,7 +20562,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1397158444}
+      - m_Target: {fileID: 2115116945}
         m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
         m_MethodName: GoToMainMenu
         m_Mode: 1
@@ -29615,7 +29618,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1397158444}
+      - m_Target: {fileID: 2115116945}
         m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
         m_MethodName: GoToLobby
         m_Mode: 1
@@ -31242,7 +31245,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1397158444}
+      - m_Target: {fileID: 491398083}
         m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
         m_MethodName: GoToMainMenu
         m_Mode: 1
@@ -31668,7 +31671,7 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 2
+  near clip plane: 3
   far clip plane: 1000
   field of view: 60.5
   orthographic: 0
@@ -32320,7 +32323,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1397158444}
+      - m_Target: {fileID: 491398083}
         m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
         m_MethodName: GoToLobby
         m_Mode: 1

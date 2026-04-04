@@ -29450,7 +29450,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 832967068}
+      - m_Target: {fileID: 1531168749}
         m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
         m_MethodName: GoToLobby
         m_Mode: 1
@@ -30123,7 +30123,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 832967068}
+      - m_Target: {fileID: 1531168749}
         m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
         m_MethodName: GoToMainMenu
         m_Mode: 1
@@ -30436,7 +30436,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 832967068}
+      - m_Target: {fileID: 1043393419}
         m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
         m_MethodName: GoToMainMenu
         m_Mode: 1
@@ -42013,7 +42013,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 832967068}
+      - m_Target: {fileID: 1043393419}
         m_TargetAssemblyTypeName: WinConditionScreen, Assembly-CSharp
         m_MethodName: GoToLobby
         m_Mode: 1

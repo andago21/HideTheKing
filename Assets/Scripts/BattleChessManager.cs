@@ -63,8 +63,25 @@ public class BattleChessManager : NetworkBehaviour
         BoardManager board = FindObjectOfType<BoardManager>();
         if (board == null) return;
 
+        // Find pieces by stored position — they may have moved visually during FPS
+        // but their logical board position (ax,ay) and (dx,dy) never changed
         Piece attacker = board.boardPieces[ax, ay];
         Piece defender = board.boardPieces[dx, dy];
+
+        // Snap visual positions back to board squares immediately
+        // so they are in a known correct position before we apply results
+        if (attacker != null)
+        {
+            Vector3 snapA = board.squares[ax * 8 + ay].position;
+            snapA.y = attacker.transform.position.y;
+            attacker.transform.position = snapA;
+        }
+        if (defender != null)
+        {
+            Vector3 snapD = board.squares[dx * 8 + dy].position;
+            snapD.y = defender.transform.position.y;
+            defender.transform.position = snapD;
+        }
         if (attacker == null || defender == null) return;
 
         ServerStartBattle(attacker, defender);
@@ -200,7 +217,7 @@ public class BattleChessManager : NetworkBehaviour
         // No WeaponHolder needed — weapon attaches directly to camera
 
         // Reduce near clip plane to avoid clipping through figures
-        cam.nearClipPlane = 0.3f;
+        cam.nearClipPlane = 0.1f;
 
         // FPSController hinzufügen
         float headHeight = GetFigureHeadHeight(myFigure);
@@ -357,6 +374,10 @@ public class BattleChessManager : NetworkBehaviour
         Piece figure = board.boardPieces[row, col];
         if (figure == null) return;
 
+        // Only move the ENEMY figure — own figure is controlled locally
+        ChessNetworkManager localMgr = ChessNetworkManager.LocalInstance;
+        if (localMgr != null && figure.isWhite == localMgr.isWhitePlayer) return;
+
         figure.transform.position = new Vector3(x, y, z);
     }
 
@@ -435,7 +456,7 @@ public class BattleChessManager : NetworkBehaviour
             camCtrl.RestoreFromFPS();
             // Restore default near clip plane
             Camera mainCam = camCtrl.GetMainCamera();
-            if (mainCam != null) mainCam.nearClipPlane = 3f;
+            if (mainCam != null) mainCam.nearClipPlane = 0.3f;
         }
 
         // 5. Schachbrett-Ergebnis anwenden
@@ -492,8 +513,13 @@ public class BattleChessManager : NetworkBehaviour
                 try
                 {
                     GameRules gameRules = FindObjectOfType<GameRules>();
-                    if (gameRules != null && gameRules.boardManager != null)
+                    if (gameRules != null)
+                    {
+                        if (gameRules.boardManager == null)
+                            gameRules.boardManager = board;
+                        // board.isWhiteTurn is already switched — check conditions for the NEW current player
                         gameRules.CheckGameEndConditions(!board.isWhiteTurn);
+                    }
                 }
                 catch (System.Exception e)
                 {

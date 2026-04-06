@@ -43673,12 +43673,12 @@ MonoBehaviour:
   whiteBishop: {fileID: 7163552333777595991, guid: d9bd24a626fee39408f1128a8b9e9f1c, type: 3}
   whiteQueen: {fileID: 4143993747224598898, guid: 7b3b323a20a04f540888b88fb8c35d6d, type: 3}
   whiteKing: {fileID: 4376501729349753782, guid: 78eefacea99d0994aa09f288b3dd81ff, type: 3}
-  blackPawn: {fileID: 4824244325067912309, guid: 4c67ad2f3193ba643b5dadfb04ff8320, type: 3}
-  blackRook: {fileID: 2590073585237835122, guid: 499d432a93667a742bddf6ec1b9a3303, type: 3}
-  blackKnight: {fileID: 8530582265751315021, guid: ad8342b9da74b3e5aba47c5a3d7ccbf6, type: 3}
-  blackBishop: {fileID: 6585987850542504219, guid: 142aa92a3e9fe924992d6384cd3dd839, type: 3}
-  blackQueen: {fileID: 5246754002956934924, guid: d210ddf29295fb844acf4f1cb7dd369c, type: 3}
-  blackKing: {fileID: 2260879777316495995, guid: d802cf4ea8d0b5448ba5dc609f2f88e2, type: 3}
+  blackPawn: {fileID: 1636895035152030872, guid: af52a848e73b81c429e24dd7fa7674dd, type: 3}
+  blackRook: {fileID: 8522528476201242193, guid: 80ad53efeb94ec84ebe7c07e22ea0fcd, type: 3}
+  blackKnight: {fileID: 1688784955519633355, guid: 744430fe7e78f594b89f62fece3cc649, type: 3}
+  blackBishop: {fileID: 1177436924636947735, guid: ea66e8dc8c0bdab49964d3414f8aa3e1, type: 3}
+  blackQueen: {fileID: 3880065333886810862, guid: 21da955300a59b44ea56c09f3098d4e6, type: 3}
+  blackKing: {fileID: 9014532958248617085, guid: 619367e83bb70174cadc4ff165591ad1, type: 3}
   isWhiteTurn: 1
   enPassantTarget: {x: -1, y: -1}
   whiteCapturedSlots:

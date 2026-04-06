@@ -24721,7 +24721,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_Font: {fileID: 12800000, guid: 5cdfa42e2bd668a40ab5795d26c4e7a8, type: 3}
     m_FontSize: 26
     m_FontStyle: 1
     m_BestFit: 0
@@ -33068,7 +33068,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_Font: {fileID: 12800000, guid: 5cdfa42e2bd668a40ab5795d26c4e7a8, type: 3}
     m_FontSize: 26
     m_FontStyle: 1
     m_BestFit: 0
@@ -33855,7 +33855,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_Font: {fileID: 12800000, guid: 5cdfa42e2bd668a40ab5795d26c4e7a8, type: 3}
     m_FontSize: 26
     m_FontStyle: 1
     m_BestFit: 0
@@ -35620,7 +35620,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_Font: {fileID: 12800000, guid: 5cdfa42e2bd668a40ab5795d26c4e7a8, type: 3}
     m_FontSize: 26
     m_FontStyle: 1
     m_BestFit: 0
@@ -41172,7 +41172,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_Font: {fileID: 12800000, guid: 5cdfa42e2bd668a40ab5795d26c4e7a8, type: 3}
     m_FontSize: 26
     m_FontStyle: 1
     m_BestFit: 0
@@ -41772,7 +41772,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_Font: {fileID: 12800000, guid: 5cdfa42e2bd668a40ab5795d26c4e7a8, type: 3}
     m_FontSize: 26
     m_FontStyle: 1
     m_BestFit: 0
@@ -44664,18 +44664,18 @@ MonoBehaviour:
   - {fileID: 22350805}
   - {fileID: 1083552010}
   gameState: 0
-  whitePawn: {fileID: 5323106344654674602, guid: 5c2d9dc2c15bf4645814695b3036b5d2, type: 3}
-  whiteRook: {fileID: 7768081178613237500, guid: 9886809fb13704143a286e631214a87b, type: 3}
-  whiteKnight: {fileID: 699062506839624258, guid: 195cbd33cee516077afacf697ec20814, type: 3}
-  whiteBishop: {fileID: 7163552333777595991, guid: d9bd24a626fee39408f1128a8b9e9f1c, type: 3}
-  whiteQueen: {fileID: 4143993747224598898, guid: 7b3b323a20a04f540888b88fb8c35d6d, type: 3}
-  whiteKing: {fileID: 4376501729349753782, guid: 78eefacea99d0994aa09f288b3dd81ff, type: 3}
-  blackPawn: {fileID: 4824244325067912309, guid: 4c67ad2f3193ba643b5dadfb04ff8320, type: 3}
-  blackRook: {fileID: 2590073585237835122, guid: 499d432a93667a742bddf6ec1b9a3303, type: 3}
-  blackKnight: {fileID: 8530582265751315021, guid: ad8342b9da74b3e5aba47c5a3d7ccbf6, type: 3}
-  blackBishop: {fileID: 6585987850542504219, guid: 142aa92a3e9fe924992d6384cd3dd839, type: 3}
-  blackQueen: {fileID: 5246754002956934924, guid: d210ddf29295fb844acf4f1cb7dd369c, type: 3}
-  blackKing: {fileID: 2260879777316495995, guid: d802cf4ea8d0b5448ba5dc609f2f88e2, type: 3}
+  whitePawn: {fileID: 3057891784403031751, guid: f279bbde77dd2cf488caba6e493e8c88, type: 3}
+  whiteRook: {fileID: 6033007505899784319, guid: 2deb859bbb34362498127c1e5cc49221, type: 3}
+  whiteKnight: {fileID: 8668625148935783998, guid: a8a7f8aa4ae6584468c19ee756a3419f, type: 3}
+  whiteBishop: {fileID: 8818113175665942643, guid: 051134619592969418e8224dcb3fe213, type: 3}
+  whiteQueen: {fileID: 8802423657249014931, guid: c30c0051eebc5084189813f91ebd5865, type: 3}
+  whiteKing: {fileID: 7046564800008189486, guid: 09487bbf0617df647bec83a416e32e61, type: 3}
+  blackPawn: {fileID: 6477919134709514458, guid: bb430868de9dbc849bfd486122631bef, type: 3}
+  blackRook: {fileID: 6515576780943143727, guid: af1f0f39ea784e34da3e371e1eec8ecb, type: 3}
+  blackKnight: {fileID: 3694582398480707684, guid: e4a8d337bf9023241b36d686943640cc, type: 3}
+  blackBishop: {fileID: 7117152612324653857, guid: 011c7a4543b28334ca0815709cb2deac, type: 3}
+  blackQueen: {fileID: 4414470576233835147, guid: 23cb30011211380498152a4caf8be2e3, type: 3}
+  blackKing: {fileID: 8575140650084550002, guid: a9fc157731773ef46b9bb0600fd0ddd6, type: 3}
   isWhiteTurn: 1
   enPassantTarget: {x: -1, y: -1}
   whiteCapturedSlots:

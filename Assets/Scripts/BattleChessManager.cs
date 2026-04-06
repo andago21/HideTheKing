@@ -217,7 +217,7 @@ public class BattleChessManager : NetworkBehaviour
         // No WeaponHolder needed — weapon attaches directly to camera
 
         // Reduce near clip plane to avoid clipping through figures
-        cam.nearClipPlane = 0.1f;
+        cam.nearClipPlane = 0.3f;
 
         // FPSController hinzufügen
         float headHeight = GetFigureHeadHeight(myFigure);
@@ -456,7 +456,7 @@ public class BattleChessManager : NetworkBehaviour
             camCtrl.RestoreFromFPS();
             // Restore default near clip plane
             Camera mainCam = camCtrl.GetMainCamera();
-            if (mainCam != null) mainCam.nearClipPlane = 0.3f;
+            if (mainCam != null) mainCam.nearClipPlane = 3f;
         }
 
         // 5. Schachbrett-Ergebnis anwenden

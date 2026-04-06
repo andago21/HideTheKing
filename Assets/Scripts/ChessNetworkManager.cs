@@ -29,6 +29,7 @@ public class ChessNetworkManager : NetworkBehaviour
 
     [SyncVar] public bool isWhitePlayer;
     public static bool LocalIsWhite = false;
+    public static bool WasMultiplayer = false; // Set to true once a multiplayer session starts
 
     private static int  _connectedPlayers = 0;
     private static bool _gameStarted      = false;
@@ -48,6 +49,7 @@ public class ChessNetworkManager : NetworkBehaviour
         else if (isClient) { isWhitePlayer = false; Debug.Log("You are the CLIENT - Playing as BLACK"); }
 
         LocalIsWhite = isWhitePlayer;
+        WasMultiplayer = true;
     }
 
     public override void OnStartServer()
@@ -172,7 +174,9 @@ public class ChessNetworkManager : NetworkBehaviour
 
     public bool IsMyTurn()
     {
+        // If no network is active, always allow (singleplayer/AI)
         if (!NetworkClient.active && !NetworkServer.active) return true;
+        if (boardManager == null) return true;
         return (boardManager.isWhiteTurn && isWhitePlayer) ||
                (!boardManager.isWhiteTurn && !isWhitePlayer);
     }

@@ -200,7 +200,7 @@ public class BattleChessManager : NetworkBehaviour
         // No WeaponHolder needed — weapon attaches directly to camera
 
         // Reduce near clip plane to avoid clipping through figures
-        cam.nearClipPlane = 0.1f;
+        cam.nearClipPlane = 0.3f;
 
         // FPSController hinzufügen
         float headHeight = GetFigureHeadHeight(myFigure);
@@ -435,7 +435,7 @@ public class BattleChessManager : NetworkBehaviour
             camCtrl.RestoreFromFPS();
             // Restore default near clip plane
             Camera mainCam = camCtrl.GetMainCamera();
-            if (mainCam != null) mainCam.nearClipPlane = 0.3f;
+            if (mainCam != null) mainCam.nearClipPlane = 3f;
         }
 
         // 5. Schachbrett-Ergebnis anwenden
@@ -486,19 +486,27 @@ public class BattleChessManager : NetworkBehaviour
             if (NetworkServer.active)
                 board.isWhiteTurn = !board.isWhiteTurn;
 
-            // Checkmate/Stalemate prüfen nach Battle Chess
-            GameRules gameRules = FindObjectOfType<GameRules>();
-            if (gameRules != null)
-                gameRules.CheckGameEndConditions(!board.isWhiteTurn);
-
-            // Spielende ans Netzwerk senden wenn nötig
-            if (board.gameState != GameState.Playing)
+            // Checkmate/Stalemate — nur Server prüft und sendet Ergebnis
+            if (NetworkServer.active)
             {
-                ChessNetworkManager net = ChessNetworkManager.LocalInstance;
-                if (net != null && net.IsMultiplayer())
+                try
                 {
-                    net.SendGameEnd(board.gameState);
-                    net.SendEloSync(board.gameState);
+                    GameRules gameRules = FindObjectOfType<GameRules>();
+                    if (gameRules != null && gameRules.boardManager != null)
+                        gameRules.CheckGameEndConditions(!board.isWhiteTurn);
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError("[BattleChess] CheckGameEndConditions error: " + e.Message);
+                }
+
+                if (board.gameState != GameState.Playing)
+                {
+                    ChessNetworkManager net = ChessNetworkManager.LocalInstance;
+                    if (net != null)
+                        net.SendGameEnd(board.gameState);
+                    else
+                        RpcForceGameEnd((int)board.gameState);
                 }
             }
         }
@@ -506,18 +514,26 @@ public class BattleChessManager : NetworkBehaviour
         // 6. Andere Figuren wiederherstellen
         RestoreHiddenPieces();
 
-        // 7. Input wiederherstellen
-        PlayerInput input = FindObjectOfType<PlayerInput>();
-        if (input != null) input.enabled = true;
+        // 7. Input wiederherstellen — nur wenn Spiel noch läuft
+        if (board == null || board.gameState == GameState.Playing)
+        {
+            PlayerInput input = FindObjectOfType<PlayerInput>();
+            if (input != null) input.enabled = true;
+        }
 
-        // 8. Cursor zurücksetzen
+        // 8. Cursor IMMER zurücksetzen
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible   = true;
-
-        // Crosshair deaktivieren
         if (crosshair != null) crosshair.SetActive(false);
 
         Debug.Log("[BattleChess] Normal chess resumed.");
+    }
+
+    [ClientRpc]
+    private void RpcForceGameEnd(int result)
+    {
+        BoardManager board = FindObjectOfType<BoardManager>();
+        if (board != null) board.HandleGameEnd((GameState)result);
     }
 
     private void HideOtherPieces(Piece attacker, Piece defender)

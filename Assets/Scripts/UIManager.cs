@@ -13,6 +13,8 @@ public class UIManager : MonoBehaviour
     
     private GameState _lastState = GameState.Playing;
     private bool _eloGiven = false;
+    private bool _localColorCached = false;
+    private bool _cachedLocalIsWhite = true;
 
     void Start()
     {
@@ -32,6 +34,14 @@ public class UIManager : MonoBehaviour
     void Update()
     {
         if (boardManager == null) return;
+
+        // Cache local player color as early as possible while LocalInstance is still alive
+        if (!_localColorCached && ChessNetworkManager.LocalInstance != null)
+        {
+            _cachedLocalIsWhite = ChessNetworkManager.LocalInstance.isWhitePlayer;
+            _localColorCached = true;
+            Debug.Log("UIManager: Cached local color = " + (_cachedLocalIsWhite ? "White" : "Black"));
+        }
 
         var state = boardManager.gameState;
         if (state != _lastState && state != GameState.Playing)

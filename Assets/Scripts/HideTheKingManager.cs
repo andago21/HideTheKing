@@ -22,7 +22,6 @@ namespace HideTheKing.Core
         private bool blackHiddenInCheck = false;
         private HashSet<Piece> reportedCaptured = new HashSet<Piece>();
 
-        // Netzwerk-sync: Board-Index des versteckten Königs (row * 8 + col)
         [SyncVar(hook = nameof(OnWhiteHiddenIndexChanged))]
         private int _whiteHiddenIndex = -1;
 
@@ -114,7 +113,6 @@ namespace HideTheKing.Core
 
             if (NetworkServer.active)
             {
-                // Host wählt versteckte Könige und synchronisiert per SyncVar
                 _whiteLogic = new HiddenTargetLogicGeneric();
                 _whiteLogic.Initialize(pieces, hiddenIsWhite: true);
                 _whiteLogic.OnGameOver += HandleGameOver;
@@ -123,7 +121,6 @@ namespace HideTheKing.Core
                 _blackLogic.Initialize(pieces, hiddenIsWhite: false);
                 _blackLogic.OnGameOver += HandleGameOver;
 
-                // SyncVar setzen — wird automatisch zum Client gesendet
                 var whiteState = _whiteLogic.Snapshot();
                 var blackState = _blackLogic.Snapshot();
 
@@ -134,16 +131,13 @@ namespace HideTheKing.Core
             }
             else
             {
-                // Client wartet auf SyncVar — wird über Hook initialisiert
                 Debug.Log("[HideTheKing] Client: Warte auf SyncVar vom Host...");
 
-                // Falls SyncVar bereits gesetzt wurde bevor wir hier ankamen
                 if (_whiteHiddenIndex != -1 && _blackHiddenIndex != -1)
                     InitializeFromSyncVars(pieces);
             }
         }
 
-        // SyncVar Hooks — werden aufgerufen wenn Host die Werte setzt
         private void OnWhiteHiddenIndexChanged(int oldVal, int newVal)
         {
             Debug.Log($"[HideTheKing] Client: White hidden index empfangen: {newVal}");
@@ -159,7 +153,7 @@ namespace HideTheKing.Core
         private void TryInitializeClientLogic()
         {
             if (_whiteHiddenIndex == -1 || _blackHiddenIndex == -1) return;
-            if (NetworkServer.active) return; // Host braucht das nicht
+            if (NetworkServer.active) return;
 
             var pieces = FindObjectsOfType<Piece>(true)
                 .Where(p => p != null)
@@ -239,22 +233,24 @@ namespace HideTheKing.Core
 
             GameState result = capturingIsWhite ? GameState.WhiteWins : GameState.BlackWins;
 
+            // Client: only stop timer — UIManager handles display via RpcReceiveGameEnd from server
+            if (!NetworkServer.active)
+            {
+                ChessTimer timer = FindObjectOfType<ChessTimer>();
+                if (timer != null) timer.StopTimer();
+                return;
+            }
+
+            // SERVER only from here:
             if (_gameRules != null && _gameRules.boardManager != null)
                 _gameRules.boardManager.gameState = result;
 
-            // Multiplayer: Ergebnis synchronisieren
-            if (NetworkServer.active)
-            {
-                ChessNetworkManager netManager = ChessNetworkManager.LocalInstance;
-                if (netManager != null)
-                {
-                    netManager.SendGameEnd(result);
-                    netManager.SendEloSync(result);
-                }
-            }
+            ChessNetworkManager netManager = ChessNetworkManager.LocalInstance;
+            if (netManager != null)
+                netManager.SendGameEnd(result);
 
-            ChessTimer timer = FindObjectOfType<ChessTimer>();
-            if (timer != null) timer.StopTimer();
+            ChessTimer timerServer = FindObjectOfType<ChessTimer>();
+            if (timerServer != null) timerServer.StopTimer();
 
             BoardManager board = FindObjectOfType<BoardManager>();
             if (board != null) board.enabled = false;

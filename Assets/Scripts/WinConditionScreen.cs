@@ -12,7 +12,6 @@ public class WinConditionScreen : MonoBehaviour
         if      (scene.Contains("BattleChess"))       lobby = "BattleChessLobby";
         else if (scene.Contains("HideTheKing"))        lobby = "HideTheKingLobby";
         else if (scene.Contains("CrownOfConfussions")) lobby = "CrownOfConfusionsLobby";
-        else if (scene.Contains("Offline")) lobby = "ClassicOfflineLobby";
 
         StartCoroutine(StopAndLoad(lobby));
     }
@@ -31,6 +30,9 @@ public class WinConditionScreen : MonoBehaviour
         else if (NetworkClient.isConnected)
             NetworkManager.singleton.StopClient();
 
+        // Reset multiplayer flag so next game starts fresh
+        ChessNetworkManager.WasMultiplayer = false;
+
         // Wait for Mirror to fully stop
         yield return new WaitForSeconds(0.5f);
 
@@ -41,8 +43,8 @@ public class WinConditionScreen : MonoBehaviour
     {
         Debug.Log("Game is exiting...");
         Application.Quit();
-        #if UNITY_EDITOR
-                UnityEditor.EditorApplication.isPlaying = false;
-        #endif
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#endif
     }
 }

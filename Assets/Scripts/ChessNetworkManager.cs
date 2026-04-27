@@ -77,7 +77,6 @@ public class ChessNetworkManager : NetworkBehaviour
         _connectedPlayers = 0;
         _gameStarted      = false;
         _eloGiven         = false;
-        // Don't reset WasMultiplayer here — UIManager still needs it after disconnect
     }
 
     [ClientRpc]
@@ -133,22 +132,7 @@ public class ChessNetworkManager : NetworkBehaviour
     [ClientRpc]
     private void RpcReceiveGameEnd(int result)
     {
-        GameState state = (GameState)result;
-
-        // Give ELO immediately before scene might change
-        string sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-        bool isClassic = sceneName.Contains("Classic");
-        if (isClassic && EloManager.Instance != null && !_eloGiven)
-        {
-            _eloGiven = true;
-            bool iWon  = (state == GameState.WhiteWins &&  isWhitePlayer) ||
-                         (state == GameState.BlackWins  && !isWhitePlayer);
-            float eloResult = iWon ? 1f : (state == GameState.Draw ? 0.5f : 0f);
-            EloManager.Instance.UpdateElo(eloResult, 1200);
-            Debug.Log($"[ELO] RpcReceiveGameEnd: result={eloResult} isWhite={isWhitePlayer}");
-        }
-
-        if (boardManager != null) boardManager.HandleGameEnd(state);
+        if (boardManager != null) boardManager.HandleGameEnd((GameState)result);
     }
 
     // ── ELO Sync ──

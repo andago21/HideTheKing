@@ -13,11 +13,12 @@ public class TutorialManager : MonoBehaviour
     public GameObject bishopPrefab;
     public GameObject queenPrefab;
     public GameObject kingPrefab;
+    public GameObject blackKingPrefab;
     public GameObject knightPrefab;
     public GameObject pawnPrefab;
     public GameObject highlightPrefab;
     public GameObject highlightPrefabLayer2;
-
+    
     public Transform rookSpawnTransform;
     public Transform[] rookHighlightTransforms;
     public Transform bishopSpawnTransform;
@@ -30,10 +31,22 @@ public class TutorialManager : MonoBehaviour
     public Transform[] knightHighlightTransforms;
     public Transform pawnSpawnTransform;
     public Transform[] pawnHighlightTransforms;
-    public Transform[] highlightTransformsLayer2;
 
+    [Header("Capture Tutorial")]
+    public Transform captureRookSpawnTransform;
+    public Transform capturePawnSpawnTransformA;
+    public Transform capturePawnSpawnTransformB;
+    public GameObject capturePawnPrefab;
+
+    [Header("Stalemate Tutorial")]
+    public Transform stalemateBishopSpawnTransform;
+    public Transform stalemateRookSpawnTransform;
+    public Transform stalemateKingSpawnTransform;
+    public Transform[] stalemateHighlightTransforms;
+        
     public float highlightYOffset = 0.01f;
     public bool clearEntireBoardOnCompletion = true;
+    [SerializeField, Min(0f)] float clearBoardDelaySeconds = 1f;
 
     public Canvas sourceCanvas;
     public Canvas rookTargetCanvas;
@@ -42,6 +55,10 @@ public class TutorialManager : MonoBehaviour
     public Canvas kingTargetCanvas;
     public Canvas knightTargetCanvas;
     public Canvas pawnTargetCanvas;
+    public Canvas captureTargetCanvas;
+    public Canvas stalemateTargetCanvas;
+    public Canvas castlingTargetCanvas;
+    public Canvas enPassantTargetCanvas;
 
     [Header("Promotion Panel")]
     public GameObject promotionPanel;
@@ -60,6 +77,8 @@ public class TutorialManager : MonoBehaviour
     GameObject _kingInstance;
     GameObject _knightInstance;
     GameObject _pawnInstance;
+    readonly List<GameObject> _capturePawnInstances = new List<GameObject>();
+    readonly List<GameObject> _stalemateSupportInstances = new List<GameObject>();
     readonly List<GameObject> _highlights = new List<GameObject>();
     readonly HashSet<int> _tutorialTargets = new HashSet<int>();
     readonly HashSet<int> _visitedTargets = new HashSet<int>();
@@ -68,6 +87,7 @@ public class TutorialManager : MonoBehaviour
     bool _pieceSelected;
 
     GameState _lastGameState = GameState.Playing;
+    Coroutine _pendingClearRoutine;
 
     void Awake()
     {
@@ -86,6 +106,9 @@ public class TutorialManager : MonoBehaviour
 
     void EnsureSquaresAttached()
     {
+        // Starting another tutorial mode should cancel any queued auto-clear from the previous one.
+        CancelPendingTutorialClear();
+
         if ((squares == null || squares.Length != 64) && boardManager != null)
             squares = boardManager.squares;
         if (squares == null || squares.Length != 64) return;
@@ -119,6 +142,10 @@ public class TutorialManager : MonoBehaviour
             SetCanvas(kingTargetCanvas, false);
             SetCanvas(knightTargetCanvas, false);
             SetCanvas(pawnTargetCanvas, false);
+            SetCanvas(captureTargetCanvas, false);
+            SetCanvas(stalemateTargetCanvas, false);
+            SetCanvas(castlingTargetCanvas, false);
+            SetCanvas(enPassantTargetCanvas, false);
         }
         _lastGameState = state;
     }
@@ -170,32 +197,18 @@ public class TutorialManager : MonoBehaviour
         Debug.Log("Tutorial piece selected. Click a highlighted square to move.");
 
         // Optional: Add a material highlight to the selected piece
-        if (_pawnInstance != null)
+        var activePieceInstance = _pawnInstance ?? _knightInstance ?? _kingInstance ?? _queenInstance ?? _rookInstance ?? _bishopInstance;
+        switch (activePieceInstance)
         {
-            HighlightPiece(_pawnInstance);
-        }
-        else if (_knightInstance != null)
-        {
-            HighlightPiece(_knightInstance);
-        }
-        else if (_kingInstance != null)
-        {
-            HighlightPiece(_kingInstance);
-        }
-        else if (_queenInstance != null)
-        {
-            HighlightPiece(_queenInstance);
-        }
-        else if (_rookInstance != null)
-        {
-            HighlightPiece(_rookInstance);
-        }
-        else if (_bishopInstance != null)
-        {
-            HighlightPiece(_bishopInstance);
+            case null:
+                break;
+            default:
+                HighlightPiece(activePieceInstance);
+                break;
         }
 
-        // Show legal moves as highlights
+        // Always show legal move highlights when piece is selected.
+        ClearLegalMoveHighlights();
         ShowLegalMovesForActivePiece();
     }
 
@@ -207,52 +220,35 @@ public class TutorialManager : MonoBehaviour
         var legal = piece.GetLegalMovesWithCheckValidation(boardManager != null
             ? boardManager.boardPieces
             : new Piece[8, 8]);
-        
+
         // Fallback if check validation fails
         if (legal == null || legal.Count == 0)
         {
-            var raw = piece.GetLegalMoves(boardManager != null ? boardManager.boardPieces : new Piece[8,8]);
+            var raw = piece.GetLegalMoves(boardManager != null ? boardManager.boardPieces : new Piece[8, 8]);
             if (raw != null && raw.Count > 0)
             {
                 legal = raw;
             }
             else
             {
-                // Generate moves based on piece type
-                if (_rookInstance != null) legal = GenerateRookMoves(piece.position, piece.isWhite);
+                if (_rookInstance   != null) legal = GenerateRookMoves(piece.position, piece.isWhite);
                 else if (_bishopInstance != null) legal = GenerateBishopMoves(piece.position, piece.isWhite);
-                else if (_queenInstance != null) legal = GenerateQueenMoves(piece.position, piece.isWhite);
-                else if (_kingInstance != null) legal = GenerateKingMoves(piece.position, piece.isWhite);
+                else if (_queenInstance  != null) legal = GenerateQueenMoves(piece.position, piece.isWhite);
+                else if (_kingInstance   != null) legal = GenerateKingMoves(piece.position, piece.isWhite);
                 else if (_knightInstance != null) legal = GenerateKnightMoves(piece.position, piece.isWhite);
-                else if (_pawnInstance != null) legal = GeneratePawnMoves(piece.position, piece.isWhite, piece.hasMoved);
-                
+                else if (_pawnInstance   != null) legal = GeneratePawnMoves(piece.position, piece.isWhite, piece.hasMoved);
                 if (legal == null) legal = new List<Vector2Int>();
             }
         }
 
-        // Show highlights for legal moves
+        // Show base highlightPrefab for every legal move square.
+        // If that square is also a tutorial target the Layer2 star is already
+        // there and both will coexist. If a target square is NOT a legal move
+        // only the star stays (no base highlight).
         foreach (var move in legal)
         {
             int moveIndex = move.x * 8 + move.y;
-            // Only create new highlight if it doesn't already exist
-            bool alreadyHighlighted = false;
-            foreach (var h in _highlights)
-            {
-                if (h != null)
-                {
-                    var th = h.GetComponent<TutorialHighlight>();
-                    if (th != null && th.index == moveIndex)
-                    {
-                        alreadyHighlighted = true;
-                        break;
-                    }
-                }
-            }
-            
-            if (!alreadyHighlighted)
-            {
-                ShowLegalMoveHighlightAtIndex(moveIndex);
-            }
+            ShowLegalMoveHighlightAtIndex(moveIndex);
         }
     }
 
@@ -275,29 +271,14 @@ public class TutorialManager : MonoBehaviour
         _pieceSelected = false;
 
         // Reset visual feedback
-        if (_pawnInstance != null)
+        var activePieceInstance = _pawnInstance ?? _knightInstance ?? _kingInstance ?? _queenInstance ?? _rookInstance ?? _bishopInstance;
+        switch (activePieceInstance)
         {
-            RestorePieceAppearance(_pawnInstance);
-        }
-        else if (_knightInstance != null)
-        {
-            RestorePieceAppearance(_knightInstance);
-        }
-        else if (_kingInstance != null)
-        {
-            RestorePieceAppearance(_kingInstance);
-        }
-        else if (_queenInstance != null)
-        {
-            RestorePieceAppearance(_queenInstance);
-        }
-        else if (_rookInstance != null)
-        {
-            RestorePieceAppearance(_rookInstance);
-        }
-        else if (_bishopInstance != null)
-        {
-            RestorePieceAppearance(_bishopInstance);
+            case null:
+                break;
+            default:
+                RestorePieceAppearance(activePieceInstance);
+                break;
         }
     }
 
@@ -319,16 +300,13 @@ public class TutorialManager : MonoBehaviour
         if (promotionPanel != null)
         {
             promotionPanel.SetActive(true);
-            StartCoroutine(HidePromotionPanelAfterDelay(7f));
+            StartCoroutine(HidePromotionPanelAfterDelay(5f));
         }
     }
 
     public void HidePromotionPanel()
     {
-        if (promotionPanel != null)
-        {
-            promotionPanel.SetActive(false);
-        }
+        if (promotionPanel != null) promotionPanel.SetActive(false);
     }
 
     private IEnumerator HidePromotionPanelAfterDelay(float delay)
@@ -337,12 +315,15 @@ public class TutorialManager : MonoBehaviour
         HidePromotionPanel();
     }
 
-    // ── Button handlers ───────────────────────────────────────────────────────
     public void OnRookButton()
     {
         EnsureSquaresAttached();
+        ResetEnPassantTutorialState();
         SetCanvas(sourceCanvas, false);
         SetCanvas(rookTargetCanvas, true);
+        SetCanvas(captureTargetCanvas, false);
+        SetCanvas(stalemateTargetCanvas, false);
+        SetCanvas(enPassantTargetCanvas, false);
 
         if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
         if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
@@ -362,8 +343,6 @@ public class TutorialManager : MonoBehaviour
 
         if (rookHighlightTransforms != null && rookHighlightTransforms.Length > 0)
         {
-            CreateHighlightsFromTransforms(rookHighlightTransforms);
-            // Show same highlights on Layer2 on top
             CreateHighlightsLayer2FromTransforms(rookHighlightTransforms);
         }
     }
@@ -371,9 +350,13 @@ public class TutorialManager : MonoBehaviour
     public void OnBishopButton()
     {
         EnsureSquaresAttached();
+        ResetEnPassantTutorialState();
         SetCanvas(sourceCanvas, false);
         SetCanvas(rookTargetCanvas, false);
         SetCanvas(bishopTargetCanvas, true);
+        SetCanvas(captureTargetCanvas, false);
+        SetCanvas(stalemateTargetCanvas, false);
+        SetCanvas(enPassantTargetCanvas, false);
 
         if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
         if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
@@ -383,18 +366,14 @@ public class TutorialManager : MonoBehaviour
             int spawnIndex = GetIndexFromTransform(bishopSpawnTransform);
             InstantiateBishopAtIndex(spawnIndex);
         }
-        else
-        {
-            InstantiateBishopAtAlgebraic("d4");
-        }
+        else  InstantiateBishopAtAlgebraic("d4");
+        
 
         ClearHighlights();
         _pieceSelected = false;
 
         if (bishopHighlightTransforms != null && bishopHighlightTransforms.Length > 0)
         {
-            CreateHighlightsFromTransforms(bishopHighlightTransforms);
-            // Show same highlights on Layer2 on top
             CreateHighlightsLayer2FromTransforms(bishopHighlightTransforms);
         }
     }
@@ -402,10 +381,14 @@ public class TutorialManager : MonoBehaviour
     public void OnQueenButton()
     {
         EnsureSquaresAttached();
+        ResetEnPassantTutorialState();
         SetCanvas(sourceCanvas, false);
         SetCanvas(rookTargetCanvas, false);
         SetCanvas(bishopTargetCanvas, false);
         SetCanvas(queenTargetCanvas, true);
+        SetCanvas(captureTargetCanvas, false);
+        SetCanvas(stalemateTargetCanvas, false);
+        SetCanvas(enPassantTargetCanvas, false);
 
         if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
         if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
@@ -425,8 +408,6 @@ public class TutorialManager : MonoBehaviour
 
         if (queenHighlightTransforms != null && queenHighlightTransforms.Length > 0)
         {
-            CreateHighlightsFromTransforms(queenHighlightTransforms);
-            // Show same highlights on Layer2 on top
             CreateHighlightsLayer2FromTransforms(queenHighlightTransforms);
         }
     }
@@ -434,11 +415,15 @@ public class TutorialManager : MonoBehaviour
     public void OnKingButton()
     {
         EnsureSquaresAttached();
+        ResetEnPassantTutorialState();
         SetCanvas(sourceCanvas, false);
         SetCanvas(rookTargetCanvas, false);
         SetCanvas(bishopTargetCanvas, false);
         SetCanvas(queenTargetCanvas, false);
         SetCanvas(kingTargetCanvas, true);
+        SetCanvas(captureTargetCanvas, false);
+        SetCanvas(stalemateTargetCanvas, false);
+        SetCanvas(enPassantTargetCanvas, false);
 
         if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
         if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
@@ -458,21 +443,102 @@ public class TutorialManager : MonoBehaviour
 
         if (kingHighlightTransforms != null && kingHighlightTransforms.Length > 0)
         {
-            CreateHighlightsFromTransforms(kingHighlightTransforms);
-            // Show same highlights on Layer2 on top
             CreateHighlightsLayer2FromTransforms(kingHighlightTransforms);
+        }
+    }
+
+    public void OnCastlingButton()
+    {
+        EnsureSquaresAttached();
+        ResetEnPassantTutorialState();
+
+        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
+        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
+
+        if (boardManager != null)
+        {
+            ClearEntireBoard();
+            boardManager.gameState = GameState.Playing;
+            boardManager.isWhiteTurn = true;
+            boardManager.enPassantTarget = new Vector2Int(-1, -1);
+        }
+
+        SetCanvas(sourceCanvas, false);
+        SetCanvas(rookTargetCanvas, false);
+        SetCanvas(bishopTargetCanvas, false);
+        SetCanvas(queenTargetCanvas, false);
+        SetCanvas(kingTargetCanvas, false);
+        SetCanvas(knightTargetCanvas, false);
+        SetCanvas(pawnTargetCanvas, false);
+        SetCanvas(captureTargetCanvas, false);
+        SetCanvas(stalemateTargetCanvas, false);
+        SetCanvas(castlingTargetCanvas, true);
+        SetCanvas(enPassantTargetCanvas, false);
+
+        ClearHighlights();
+        ClearCapturePawns();
+        ClearStalemateSupportPieces();
+        _pieceSelected = false;
+
+        // White setup matching the castling lesson board.
+        InstantiateKingAtAlgebraic("e1");
+        AddCastlingSupportPiece("a1", true, PieceType.Rook);
+        AddCastlingSupportPiece("h1", true, PieceType.Rook);
+        AddCastlingSupportPiece("b1", true, PieceType.Knight);
+        AddCastlingSupportPiece("c1", true, PieceType.Bishop);
+        AddCastlingSupportPiece("d1", true, PieceType.Queen);
+        AddCastlingSupportPiece("c4", true, PieceType.Bishop);
+        AddCastlingSupportPiece("f3", true, PieceType.Knight);
+        AddCastlingSupportPiece("a2", true, PieceType.Pawn);
+        AddCastlingSupportPiece("b2", true, PieceType.Pawn);
+        AddCastlingSupportPiece("c2", true, PieceType.Pawn);
+        AddCastlingSupportPiece("d2", true, PieceType.Pawn);
+        AddCastlingSupportPiece("e3", true, PieceType.Pawn);
+        AddCastlingSupportPiece("f2", true, PieceType.Pawn);
+        AddCastlingSupportPiece("g2", true, PieceType.Pawn);
+        AddCastlingSupportPiece("h2", true, PieceType.Pawn);
+
+        // Full black army included.
+        AddCastlingSupportPiece("a8", false, PieceType.Rook);
+        AddCastlingSupportPiece("b8", false, PieceType.Knight);
+        AddCastlingSupportPiece("c8", false, PieceType.Bishop);
+        AddCastlingSupportPiece("d8", false, PieceType.Queen);
+        AddCastlingSupportPiece("e8", false, PieceType.King);
+        AddCastlingSupportPiece("f8", false, PieceType.Bishop);
+        AddCastlingSupportPiece("g8", false, PieceType.Knight);
+        AddCastlingSupportPiece("h8", false, PieceType.Rook);
+        AddCastlingSupportPiece("a7", false, PieceType.Pawn);
+        AddCastlingSupportPiece("b7", false, PieceType.Pawn);
+        AddCastlingSupportPiece("c7", false, PieceType.Pawn);
+        AddCastlingSupportPiece("d7", false, PieceType.Pawn);
+        AddCastlingSupportPiece("e7", false, PieceType.Pawn);
+        AddCastlingSupportPiece("f7", false, PieceType.Pawn);
+        AddCastlingSupportPiece("g7", false, PieceType.Pawn);
+        AddCastlingSupportPiece("h7", false, PieceType.Pawn);
+
+        _tutorialTargets.Clear();
+        _visitedTargets.Clear();
+        int kingsideCastlingTarget = AlgebraicToIndex("g1");
+        if (IsValidIndex(kingsideCastlingTarget))
+        {
+            _tutorialTargets.Add(kingsideCastlingTarget);
+            ShowHighlightAtIndexLayer2(kingsideCastlingTarget);
         }
     }
 
     public void OnKnightButton()
     {
         EnsureSquaresAttached();
+        ResetEnPassantTutorialState();
         SetCanvas(sourceCanvas, false);
         SetCanvas(rookTargetCanvas, false);
         SetCanvas(bishopTargetCanvas, false);
         SetCanvas(queenTargetCanvas, false);
         SetCanvas(kingTargetCanvas, false);
         SetCanvas(knightTargetCanvas, true);
+        SetCanvas(captureTargetCanvas, false);
+        SetCanvas(stalemateTargetCanvas, false);
+        SetCanvas(enPassantTargetCanvas, false);
 
         if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
         if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
@@ -482,18 +548,14 @@ public class TutorialManager : MonoBehaviour
             int spawnIndex = GetIndexFromTransform(knightSpawnTransform);
             InstantiateKnightAtIndex(spawnIndex);
         }
-        else
-        {
-            InstantiateKnightAtAlgebraic("d4");
-        }
+        else  InstantiateKnightAtAlgebraic("d4");
+        
 
         ClearHighlights();
         _pieceSelected = false;
 
         if (knightHighlightTransforms != null && knightHighlightTransforms.Length > 0)
         {
-            CreateHighlightsFromTransforms(knightHighlightTransforms);
-            // Show same highlights on Layer2 on top
             CreateHighlightsLayer2FromTransforms(knightHighlightTransforms);
         }
     }
@@ -501,6 +563,7 @@ public class TutorialManager : MonoBehaviour
     public void OnPawnButton()
     {
         EnsureSquaresAttached();
+        ResetEnPassantTutorialState();
         SetCanvas(sourceCanvas, false);
         SetCanvas(rookTargetCanvas, false);
         SetCanvas(bishopTargetCanvas, false);
@@ -508,6 +571,10 @@ public class TutorialManager : MonoBehaviour
         SetCanvas(kingTargetCanvas, false);
         SetCanvas(knightTargetCanvas, false);
         SetCanvas(pawnTargetCanvas, true);
+        SetCanvas(captureTargetCanvas, false);
+        SetCanvas(stalemateTargetCanvas, false);
+        SetCanvas(castlingTargetCanvas, false);
+        SetCanvas(enPassantTargetCanvas, false);
 
         if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
         if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
@@ -517,25 +584,76 @@ public class TutorialManager : MonoBehaviour
             int spawnIndex = GetIndexFromTransform(pawnSpawnTransform);
             InstantiatePawnAtIndex(spawnIndex);
         }
-        else
-        {
-            InstantiatePawnAtAlgebraic("d2");
-        }
+        else  InstantiatePawnAtAlgebraic("d2");
 
         ClearHighlights();
         _pieceSelected = false;
 
         if (pawnHighlightTransforms != null && pawnHighlightTransforms.Length > 0)
         {
-            CreateHighlightsFromTransforms(pawnHighlightTransforms);
-            // Show same highlights on Layer2 on top
             CreateHighlightsLayer2FromTransforms(pawnHighlightTransforms);
+        }
+    }
+
+    public void OnCaptureButton()
+    {
+        EnsureSquaresAttached();
+        ResetEnPassantTutorialState();
+        SetCanvas(sourceCanvas, false);
+        SetCanvas(rookTargetCanvas, false);
+        SetCanvas(bishopTargetCanvas, false);
+        SetCanvas(queenTargetCanvas, false);
+        SetCanvas(kingTargetCanvas, false);
+        SetCanvas(knightTargetCanvas, false);
+        SetCanvas(pawnTargetCanvas, false);
+        SetCanvas(captureTargetCanvas, true);
+        SetCanvas(stalemateTargetCanvas, false);
+        SetCanvas(castlingTargetCanvas, false);
+        SetCanvas(enPassantTargetCanvas, false);
+
+        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
+        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
+
+        ClearHighlights();
+        ClearCapturePawns();
+        // Capture tutorial needs a clean board if coming from castling/stalemate setups.
+        ClearStalemateSupportPieces();
+        _pieceSelected = false;
+
+        if (captureRookSpawnTransform != null)
+        {
+            int spawnIndex = GetIndexFromTransform(captureRookSpawnTransform);
+            InstantiateRookAtIndex(spawnIndex);
+        }
+        else
+        {
+            InstantiateRookAtAlgebraic("d4");
+        }
+
+        if (capturePawnSpawnTransformA != null)
+        {
+            int pawnAIndex = GetIndexFromTransform(capturePawnSpawnTransformA);
+            InstantiateCapturePawnAtIndex(pawnAIndex);
+        }
+        else
+        {
+            InstantiateCapturePawnAtAlgebraic("d6");
+        }
+
+        if (capturePawnSpawnTransformB != null)
+        {
+            int pawnBIndex = GetIndexFromTransform(capturePawnSpawnTransformB);
+            InstantiateCapturePawnAtIndex(pawnBIndex);
+        }
+        else
+        {
+            InstantiateCapturePawnAtAlgebraic("g4");
         }
     }
 
     public void OnBackButton()
     {
-        // Clear the current tutorial
+        ResetEnPassantTutorialState();
         ClearHighlights();
         ClearRook();
         ClearBishop();
@@ -543,18 +661,212 @@ public class TutorialManager : MonoBehaviour
         ClearKing();
         ClearKnight();
         ClearPawn();
+        ClearCapturePawns();
+        ClearStalemateSupportPieces();
         _tutorialTargets.Clear();
         _visitedTargets.Clear();
         _pieceSelected = false;
 
-        // Deactivate all piece tutorial canvases and activate source canvas
+        ClearLooseHighlightClones();
+
         SetCanvas(rookTargetCanvas, false);
         SetCanvas(bishopTargetCanvas, false);
         SetCanvas(queenTargetCanvas, false);
         SetCanvas(kingTargetCanvas, false);
         SetCanvas(knightTargetCanvas, false);
         SetCanvas(pawnTargetCanvas, false);
+        SetCanvas(captureTargetCanvas, false);
+        SetCanvas(stalemateTargetCanvas, false);
+        SetCanvas(castlingTargetCanvas, false);
+        SetCanvas(enPassantTargetCanvas, false);
         SetCanvas(sourceCanvas, true);
+    }
+
+    public void OnStalemateButton()
+    {
+        EnsureSquaresAttached();
+        ResetEnPassantTutorialState();
+
+        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
+        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
+
+        if (boardManager != null)
+        {
+            ClearEntireBoard();
+            boardManager.gameState = GameState.Playing;
+            boardManager.isWhiteTurn = true;
+            boardManager.enPassantTarget = new Vector2Int(-1, -1);
+        }
+
+        SetCanvas(sourceCanvas, false);
+        SetCanvas(rookTargetCanvas, false);
+        SetCanvas(bishopTargetCanvas, false);
+        SetCanvas(queenTargetCanvas, false);
+        SetCanvas(kingTargetCanvas, false);
+        SetCanvas(knightTargetCanvas, false);
+        SetCanvas(pawnTargetCanvas, false);
+        SetCanvas(captureTargetCanvas, false);
+        SetCanvas(stalemateTargetCanvas, true);
+        SetCanvas(castlingTargetCanvas, false);
+        SetCanvas(enPassantTargetCanvas, false);
+
+        ClearHighlights();
+        ClearCapturePawns();
+        ClearStalemateSupportPieces();
+        _pieceSelected = false;
+
+        if (stalemateBishopSpawnTransform != null)
+        {
+            InstantiateBishopAtIndex(GetIndexFromTransform(stalemateBishopSpawnTransform));
+        }
+        else
+        {
+            InstantiateBishopAtAlgebraic("g5");
+        }
+
+        if (stalemateRookSpawnTransform != null)
+        {
+            InstantiateStalemateRookAtIndex(GetIndexFromTransform(stalemateRookSpawnTransform));
+        }
+        else
+        {
+            InstantiateStalemateRookAtAlgebraic("b3");
+        }
+
+        if (stalemateKingSpawnTransform != null)
+        {
+            InstantiateStalemateBlackKingAtIndex(GetIndexFromTransform(stalemateKingSpawnTransform));
+        }
+        else
+        {
+            InstantiateStalemateBlackKingAtAlgebraic("a8");
+        }
+
+        if (stalemateHighlightTransforms != null && stalemateHighlightTransforms.Length > 0)
+        {
+            CreateHighlightsLayer2FromTransforms(stalemateHighlightTransforms);
+        }
+        else
+        {
+            _tutorialTargets.Clear();
+            _visitedTargets.Clear();
+            int targetIndex = AlgebraicToIndex("e3");
+            if (IsValidIndex(targetIndex))
+            {
+                _tutorialTargets.Add(targetIndex);
+                ShowHighlightAtIndexLayer2(targetIndex);
+            }
+        }
+    }
+
+    public void OnEnPassantButton()
+    {
+        EnsureSquaresAttached();
+        ResetEnPassantTutorialState();
+
+        if (boardManager == null) boardManager = FindObjectOfType<BoardManager>();
+        if ((squares == null || squares.Length != 64) && boardManager != null) squares = boardManager.squares;
+
+        if (boardManager != null)
+        {
+            ClearEntireBoard();
+            boardManager.gameState = GameState.Playing;
+            boardManager.isWhiteTurn = true;
+            // d6 is the en passant capture square (rank=5, file=3)
+            boardManager.enPassantTarget = new Vector2Int(5, 3);
+        }
+
+        SetCanvas(sourceCanvas, false);
+        SetCanvas(rookTargetCanvas, false);
+        SetCanvas(bishopTargetCanvas, false);
+        SetCanvas(queenTargetCanvas, false);
+        SetCanvas(kingTargetCanvas, false);
+        SetCanvas(knightTargetCanvas, false);
+        SetCanvas(pawnTargetCanvas, false);
+        SetCanvas(captureTargetCanvas, false);
+        SetCanvas(stalemateTargetCanvas, false);
+        SetCanvas(castlingTargetCanvas, false);
+        SetCanvas(enPassantTargetCanvas, true);
+
+        ClearHighlights();
+        ClearCapturePawns();
+        ClearStalemateSupportPieces();
+        _pieceSelected = false;
+
+        // ── Full black army ───────────────────────────────────────────────────
+        AddCastlingSupportPiece("a8", false, PieceType.Rook);
+        AddCastlingSupportPiece("b8", false, PieceType.Knight);
+        AddCastlingSupportPiece("c8", false, PieceType.Bishop);
+        AddCastlingSupportPiece("d8", false, PieceType.Queen);
+        AddCastlingSupportPiece("e8", false, PieceType.King);
+        AddCastlingSupportPiece("f8", false, PieceType.Bishop);
+        AddCastlingSupportPiece("g8", false, PieceType.Knight);
+        AddCastlingSupportPiece("h8", false, PieceType.Rook);
+        // Black pawns on rank 7 — d7 and g7 missing (those pawns advanced)
+        AddCastlingSupportPiece("a7", false, PieceType.Pawn);
+        AddCastlingSupportPiece("b7", false, PieceType.Pawn);
+        AddCastlingSupportPiece("c7", false, PieceType.Pawn);
+        AddCastlingSupportPiece("e7", false, PieceType.Pawn);
+        AddCastlingSupportPiece("f7", false, PieceType.Pawn);
+        AddCastlingSupportPiece("h7", false, PieceType.Pawn);
+        // Black pawn that double-moved to d5 (en passant target is d6)
+        AddCastlingSupportPiece("d5", false, PieceType.Pawn);
+
+        // ── Full white army ───────────────────────────────────────────────────
+        AddCastlingSupportPiece("a1", true, PieceType.Rook);
+        AddCastlingSupportPiece("b1", true, PieceType.Knight);
+        AddCastlingSupportPiece("c1", true, PieceType.Bishop);
+        AddCastlingSupportPiece("d1", true, PieceType.Queen);
+        AddCastlingSupportPiece("e1", true, PieceType.King);
+        AddCastlingSupportPiece("f1", true, PieceType.Bishop);
+        AddCastlingSupportPiece("g1", true, PieceType.Knight);
+        AddCastlingSupportPiece("h1", true, PieceType.Rook);
+        // White pawns on rank 2 — c2 and h2 missing (those pawns advanced)
+        AddCastlingSupportPiece("a2", true, PieceType.Pawn);
+        AddCastlingSupportPiece("b2", true, PieceType.Pawn);
+        AddCastlingSupportPiece("d2", true, PieceType.Pawn);
+        AddCastlingSupportPiece("e2", true, PieceType.Pawn);
+        AddCastlingSupportPiece("f2", true, PieceType.Pawn);
+        AddCastlingSupportPiece("g2", true, PieceType.Pawn);
+
+        // ── Interactive white pawn at c5 (captures en passant to d6) ─────────
+        InstantiatePawnAtAlgebraic("c5");
+        if (_pawnInstance != null)
+        {
+            var piece = _pawnInstance.GetComponent<Piece>();
+            if (piece != null) piece.hasMoved = true; // pawn has already moved from c2
+        }
+
+        // Highlight d6 as the tutorial target
+        _tutorialTargets.Clear();
+        _visitedTargets.Clear();
+        int epTargetIndex = AlgebraicToIndex("d6");
+        if (IsValidIndex(epTargetIndex))
+        {
+            _tutorialTargets.Add(epTargetIndex);
+            ShowHighlightAtIndexLayer2(epTargetIndex);
+        }
+    }
+
+    void ResetEnPassantTutorialState()
+    {
+        // Retained for button flow symmetry; no state to reset in single-pawn en passant mode.
+    }
+
+    void ClearLooseHighlightClones()    {
+        string baseHighlightName = highlightPrefab != null ? highlightPrefab.name + "(Clone)" : null;
+        string layer2HighlightName = highlightPrefabLayer2 != null ? highlightPrefabLayer2.name + "(Clone)" : null;
+
+        var all = FindObjectsOfType<GameObject>();
+        foreach (var go in all)
+        {
+            if (go == null) continue;
+            if ((baseHighlightName != null && go.name == baseHighlightName) ||
+                (layer2HighlightName != null && go.name == layer2HighlightName))
+            {
+                Destroy(go);
+            }
+        }
     }
 
     public void ShowHighlightAtIndex(int index)
@@ -670,10 +982,14 @@ public class TutorialManager : MonoBehaviour
 
             if (boardManager?.boardPieces != null)
             {
-                Debug.Log($"Board at target {IndexToAlgebraic(index)} contains: {boardManager.boardPieces[target.x, target.y]?.type.ToString() ?? "null"}");
+                var targetPiece = boardManager.boardPieces[target.x, target.y];
+                var targetPieceType = targetPiece != null ? targetPiece.type.ToString() : "null";
+                Debug.Log("Board at target " + IndexToAlgebraic(index) + " contains: " + targetPieceType);
             }
             return;
         }
+
+        bool clearedAllCapturePawns = false;
 
         if (boardManager?.boardPieces != null)
         {
@@ -682,6 +998,8 @@ public class TutorialManager : MonoBehaviour
             var dest = boardManager.boardPieces[target.x, target.y];
             if (dest != null && dest != piece) boardManager.SendToSide(dest);
             boardManager.boardPieces[target.x, target.y] = piece;
+
+            clearedAllCapturePawns = HandleCaptureTutorialCapture(dest);
         }
 
         var p = squares[index].position + rookPositionOffset;
@@ -689,6 +1007,11 @@ public class TutorialManager : MonoBehaviour
         _rookInstance.transform.position = p;
         piece.position = target;
         piece.hasMoved = true;
+
+        if (clearedAllCapturePawns)
+        {
+            ClearTutorial();
+        }
 
         if (_tutorialTargets.Contains(index))
         {
@@ -739,7 +1062,9 @@ public class TutorialManager : MonoBehaviour
 
             if (boardManager?.boardPieces != null)
             {
-                Debug.Log($"Board at target {IndexToAlgebraic(index)} contains: {boardManager.boardPieces[target.x, target.y]?.type.ToString() ?? "null"}");
+                var targetPiece = boardManager.boardPieces[target.x, target.y];
+                var targetPieceType = targetPiece != null ? targetPiece.type.ToString() : "null";
+                Debug.Log("Board at target " + IndexToAlgebraic(index) + " contains: " + targetPieceType);
             }
             return;
         }
@@ -807,7 +1132,9 @@ public class TutorialManager : MonoBehaviour
 
             if (boardManager?.boardPieces != null)
             {
-                Debug.Log($"Board at target {IndexToAlgebraic(index)} contains: {boardManager.boardPieces[target.x, target.y]?.type.ToString() ?? "null"}");
+                var targetPiece = boardManager.boardPieces[target.x, target.y];
+                var targetPieceType = targetPiece != null ? targetPiece.type.ToString() : "null";
+                Debug.Log("Board at target " + IndexToAlgebraic(index) + " contains: " + targetPieceType);
             }
             return;
         }
@@ -849,6 +1176,10 @@ public class TutorialManager : MonoBehaviour
         var piece = _kingInstance.GetComponent<Piece>();
         if (piece == null) return;
 
+        var old = piece.position;
+        var target = new Vector2Int(index / 8, index % 8);
+        bool isCastlingAttempt = old.x == target.x && Mathf.Abs(target.y - old.y) == 2;
+
         var legal = piece.GetLegalMovesWithCheckValidation(boardManager != null
             ? boardManager.boardPieces
             : new Piece[8, 8]);
@@ -866,7 +1197,11 @@ public class TutorialManager : MonoBehaviour
                 Debug.LogWarning("Using generated king moves as fallback for tutorial piece.");
             }
         }
-        var target = new Vector2Int(index / 8, index % 8);
+
+        // Keep castling available in tutorial mode even if the piece script omits it.
+        if (isCastlingAttempt && CanCastleInTutorial(old, target, piece.isWhite) && !legal.Contains(target))
+            legal.Add(target);
+
         if (!legal.Contains(target))
         {
             string legalStr = "";
@@ -875,14 +1210,15 @@ public class TutorialManager : MonoBehaviour
 
             if (boardManager?.boardPieces != null)
             {
-                Debug.Log($"Board at target {IndexToAlgebraic(index)} contains: {boardManager.boardPieces[target.x, target.y]?.type.ToString() ?? "null"}");
+                var targetPiece = boardManager.boardPieces[target.x, target.y];
+                var targetPieceType = targetPiece != null ? targetPiece.type.ToString() : "null";
+                Debug.Log("Board at target " + IndexToAlgebraic(index) + " contains: " + targetPieceType);
             }
             return;
         }
 
         if (boardManager?.boardPieces != null)
         {
-            var old = piece.position;
             boardManager.boardPieces[old.x, old.y] = null;
             var dest = boardManager.boardPieces[target.x, target.y];
             if (dest != null && dest != piece) boardManager.SendToSide(dest);
@@ -894,6 +1230,11 @@ public class TutorialManager : MonoBehaviour
         _kingInstance.transform.position = p;
         piece.position = target;
         piece.hasMoved = true;
+
+        if (isCastlingAttempt)
+        {
+            MoveCastlingRook(old, target, piece.isWhite);
+        }
 
         if (_tutorialTargets.Contains(index))
         {
@@ -943,7 +1284,9 @@ public class TutorialManager : MonoBehaviour
 
             if (boardManager?.boardPieces != null)
             {
-                Debug.Log($"Board at target {IndexToAlgebraic(index)} contains: {boardManager.boardPieces[target.x, target.y]?.type.ToString() ?? "null"}");
+                var targetPiece = boardManager.boardPieces[target.x, target.y];
+                var targetPieceType = targetPiece != null ? targetPiece.type.ToString() : "null";
+                Debug.Log("Board at target " + IndexToAlgebraic(index) + " contains: " + targetPieceType);
             }
             return;
         }
@@ -1011,7 +1354,9 @@ public class TutorialManager : MonoBehaviour
 
             if (boardManager?.boardPieces != null)
             {
-                Debug.Log($"Board at target {IndexToAlgebraic(index)} contains: {boardManager.boardPieces[target.x, target.y]?.type.ToString() ?? "null"}");
+                var targetPiece = boardManager.boardPieces[target.x, target.y];
+                var targetPieceType = targetPiece != null ? targetPiece.type.ToString() : "null";
+                Debug.Log("Board at target " + IndexToAlgebraic(index) + " contains: " + targetPieceType);
             }
             return;
         }
@@ -1023,16 +1368,27 @@ public class TutorialManager : MonoBehaviour
             var dest = boardManager.boardPieces[target.x, target.y];
             if (dest != null && dest != piece) boardManager.SendToSide(dest);
             boardManager.boardPieces[target.x, target.y] = piece;
+
+            // En passant capture: remove the captured pawn one rank behind the target
+            if (boardManager.enPassantTarget.x >= 0 && target == boardManager.enPassantTarget)
+            {
+                int capturedRank = piece.isWhite ? target.x - 1 : target.x + 1;
+                if (capturedRank >= 0 && capturedRank < 8)
+                {
+                    var capturedPawn = boardManager.boardPieces[capturedRank, target.y];
+                    if (capturedPawn != null && capturedPawn.isWhite != piece.isWhite)
+                    {
+                        boardManager.boardPieces[capturedRank, target.y] = null;
+                        boardManager.SendToSide(capturedPawn);
+                    }
+                }
+            }
         }
 
         var p = squares[index].position + pawnPositionOffset;
         p.y = 0f;
         _pawnInstance.transform.position = p;
-        
-        // Store the old position index before updating piece.position
-        var oldPosition = piece.position;
-        int oldPositionIndex = oldPosition.x * 8 + oldPosition.y;
-        
+
         piece.position = target;
         piece.hasMoved = true;
 
@@ -1156,6 +1512,33 @@ public class TutorialManager : MonoBehaviour
 
     void ClearTutorial()
     {
+        if (_pendingClearRoutine != null) return;
+
+        if (clearBoardDelaySeconds <= 0f)
+        {
+            ClearTutorialNow();
+            return;
+        }
+
+        _pendingClearRoutine = StartCoroutine(ClearTutorialAfterDelay());
+    }
+
+    IEnumerator ClearTutorialAfterDelay()
+    {
+        yield return new WaitForSeconds(clearBoardDelaySeconds);
+        _pendingClearRoutine = null;
+        ClearTutorialNow();
+    }
+
+    void CancelPendingTutorialClear()
+    {
+        if (_pendingClearRoutine == null) return;
+        StopCoroutine(_pendingClearRoutine);
+        _pendingClearRoutine = null;
+    }
+
+    void ClearTutorialNow()
+    {
         if (clearEntireBoardOnCompletion && boardManager != null) ClearEntireBoard();
         ClearHighlights();
         ClearRook();
@@ -1164,8 +1547,45 @@ public class TutorialManager : MonoBehaviour
         ClearKing();
         ClearKnight();
         ClearPawn();
+        ClearCapturePawns();
+        ClearStalemateSupportPieces();
         _tutorialTargets.Clear();
         _visitedTargets.Clear();
+        _pieceSelected = false;
+
+        SetCanvas(rookTargetCanvas, false);
+        SetCanvas(bishopTargetCanvas, false);
+        SetCanvas(queenTargetCanvas, false);
+        SetCanvas(kingTargetCanvas, false);
+        SetCanvas(knightTargetCanvas, false);
+        SetCanvas(pawnTargetCanvas, false);
+        SetCanvas(captureTargetCanvas, false);
+        SetCanvas(stalemateTargetCanvas, false);
+        SetCanvas(sourceCanvas, true);
+        SetCanvas(castlingTargetCanvas, false);
+        SetCanvas(enPassantTargetCanvas, false);
+    }
+
+    bool HandleCaptureTutorialCapture(Piece capturedPiece)
+    {
+        if (capturedPiece == null) return false;
+
+        CleanupMissingCapturePawns();
+
+        if (!_capturePawnInstances.Remove(capturedPiece.gameObject)) return false;
+
+        CleanupMissingCapturePawns();
+
+        return _capturePawnInstances.Count == 0;
+    }
+
+    void CleanupMissingCapturePawns()
+    {
+        for (int i = _capturePawnInstances.Count - 1; i >= 0; i--)
+        {
+            if (_capturePawnInstances[i] == null)
+                _capturePawnInstances.RemoveAt(i);
+        }
     }
 
     void ClearEntireBoard()
@@ -1178,6 +1598,13 @@ public class TutorialManager : MonoBehaviour
         var kingPiece = _kingInstance != null ? _kingInstance.GetComponent<Piece>() : null;
         var knightPiece = _knightInstance != null ? _knightInstance.GetComponent<Piece>() : null;
         var pawnPiece = _pawnInstance != null ? _pawnInstance.GetComponent<Piece>() : null;
+        var stalemateSupportPieces = new HashSet<Piece>();
+        foreach (var supportInstance in _stalemateSupportInstances)
+        {
+            if (supportInstance == null) continue;
+            var supportPiece = supportInstance.GetComponent<Piece>();
+            if (supportPiece != null) stalemateSupportPieces.Add(supportPiece);
+        }
 
         for (int r = 0; r < 8; r++)
         for (int c = 0; c < 8; c++)
@@ -1185,7 +1612,7 @@ public class TutorialManager : MonoBehaviour
             var p = boardManager.boardPieces[r, c];
             if (p == null) continue;
 
-            if (p == rookPiece || p == bishopPiece || p == queenPiece || p == kingPiece || p == knightPiece || p == pawnPiece)
+            if (p == rookPiece || p == bishopPiece || p == queenPiece || p == kingPiece || p == knightPiece || p == pawnPiece || stalemateSupportPieces.Contains(p))
             {
                 boardManager.boardPieces[r, c] = null;
                 if (p == rookPiece) Destroy(_rookInstance);
@@ -1194,6 +1621,7 @@ public class TutorialManager : MonoBehaviour
                 if (p == kingPiece) Destroy(_kingInstance);
                 if (p == knightPiece) Destroy(_knightInstance);
                 if (p == pawnPiece) Destroy(_pawnInstance);
+                if (stalemateSupportPieces.Contains(p)) Destroy(p.gameObject);
                 continue;
             }
 
@@ -1207,6 +1635,7 @@ public class TutorialManager : MonoBehaviour
         _kingInstance = null;
         _knightInstance = null;
         _pawnInstance = null;
+        _stalemateSupportInstances.Clear();
 
         SetCanvas(sourceCanvas, true);
         SetCanvas(rookTargetCanvas, false);
@@ -1215,6 +1644,10 @@ public class TutorialManager : MonoBehaviour
         SetCanvas(kingTargetCanvas, false);
         SetCanvas(knightTargetCanvas, false);
         SetCanvas(pawnTargetCanvas, false);
+        SetCanvas(captureTargetCanvas, false);
+        SetCanvas(stalemateTargetCanvas, false);
+        SetCanvas(castlingTargetCanvas, false);
+        SetCanvas(enPassantTargetCanvas, false);
     }
 
     void InstantiateRookAtAlgebraic(string alg)
@@ -1445,24 +1878,21 @@ public class TutorialManager : MonoBehaviour
         {
             child.localScale = new Vector3(32f, 32f, 32f);
         }
+
         var piece = _pawnInstance.GetComponent<Piece>();
-        if (piece == null)
-        {
-            piece = _pawnInstance.AddComponent<Piece>();
-        }
-        // Ensure PawnPiece script is present for proper move generation
-        var pawnPiece = _pawnInstance.GetComponent<PawnPiece>();
-        if (pawnPiece == null)
-        {
-            pawnPiece = _pawnInstance.AddComponent<PawnPiece>();
-        }
+        if (piece == null) piece = _pawnInstance.AddComponent<Piece>();
+
+        if (_pawnInstance.GetComponent<PawnPiece>() == null)
+            _pawnInstance.AddComponent<PawnPiece>();
+
         if (piece != null)
         {
             piece.position = new Vector2Int(index / 8, index % 8);
             piece.isWhite = true;
-            piece.hasMoved = true;  // Set to true so pawn only moves 1 square, not 2 from starting position
-            piece.type = PieceType.Pawn;  // Set the piece type
+            piece.hasMoved = false;
+            piece.type = PieceType.Pawn;
         }
+
         if (boardManager?.boardPieces != null)
         {
             boardManager.boardPieces[index / 8, index % 8] = piece;
@@ -1483,6 +1913,246 @@ public class TutorialManager : MonoBehaviour
         }
     }
 
+    void InstantiateCapturePawnAtAlgebraic(string alg)
+    {
+        int idx = AlgebraicToIndex(alg);
+        if (IsValidIndex(idx)) InstantiateCapturePawnAtIndex(idx);
+    }
+
+    void InstantiateStalemateRookAtAlgebraic(string alg)
+    {
+        int idx = AlgebraicToIndex(alg);
+        if (IsValidIndex(idx)) InstantiateStalemateRookAtIndex(idx);
+    }
+
+    void InstantiateStalemateRookAtIndex(int index)
+    {
+        var prefab = boardManager != null && boardManager.whiteRook != null ? boardManager.whiteRook : rookPrefab;
+        var rookInstance = InstantiateSupportPieceAtIndex(prefab, index, true, PieceType.Rook, rookPositionOffset);
+        if (rookInstance != null) _stalemateSupportInstances.Add(rookInstance);
+    }
+
+    void InstantiateStalemateBlackKingAtAlgebraic(string alg)
+    {
+        int idx = AlgebraicToIndex(alg);
+        if (IsValidIndex(idx)) InstantiateStalemateBlackKingAtIndex(idx);
+    }
+
+    void InstantiateStalemateBlackKingAtIndex(int index)
+    {
+        var prefab = blackKingPrefab != null ? blackKingPrefab : kingPrefab;
+        var kingInstance = InstantiateSupportPieceAtIndex(prefab, index, false, PieceType.King, kingPositionOffset);
+        if (kingInstance != null) _stalemateSupportInstances.Add(kingInstance);
+    }
+
+    GameObject InstantiateSupportPieceAtIndex(GameObject prefab, int index, bool isWhite, PieceType pieceType, Vector3 positionOffset)
+    {
+        if (!IsValidIndex(index) || prefab == null) return null;
+
+        var pos = squares[index].position + positionOffset;
+        pos.y = 0f;
+
+        var instance = Instantiate(prefab, pos, prefab.transform.rotation);
+        var piece = instance.GetComponent<Piece>();
+        if (piece == null) piece = instance.AddComponent<Piece>();
+
+        EnsurePieceBehavior(instance, pieceType);
+
+        piece.position = new Vector2Int(index / 8, index % 8);
+        piece.isWhite = isWhite;
+        piece.hasMoved = pieceType != PieceType.King ? false : true;
+        piece.type = pieceType;
+
+        if (boardManager?.boardPieces != null)
+        {
+            var existing = boardManager.boardPieces[index / 8, index % 8];
+            if (existing != null && existing != piece) boardManager.SendToSide(existing);
+            boardManager.boardPieces[index / 8, index % 8] = piece;
+        }
+
+        if (instance.GetComponent<Collider>() == null)
+        {
+            var bc = instance.AddComponent<SphereCollider>();
+            bc.radius = 0.3f;
+            bc.isTrigger = false;
+        }
+
+        return instance;
+    }
+
+    void AddCastlingSupportPiece(string algebraic, bool isWhite, PieceType pieceType)
+    {
+        int index = AlgebraicToIndex(algebraic);
+        if (!IsValidIndex(index)) return;
+
+        var prefab = GetSupportPrefab(isWhite, pieceType);
+        var instance = InstantiateSupportPieceAtIndex(prefab, index, isWhite, pieceType, GetPieceOffset(pieceType));
+        if (instance != null) _stalemateSupportInstances.Add(instance);
+    }
+
+    GameObject GetSupportPrefab(bool isWhite, PieceType pieceType)
+    {
+        if (boardManager == null) return null;
+
+        if (isWhite)
+        {
+            switch (pieceType)
+            {
+                case PieceType.Pawn: return boardManager.whitePawn != null ? boardManager.whitePawn : pawnPrefab;
+                case PieceType.Rook: return boardManager.whiteRook != null ? boardManager.whiteRook : rookPrefab;
+                case PieceType.Knight: return boardManager.whiteKnight != null ? boardManager.whiteKnight : knightPrefab;
+                case PieceType.Bishop: return boardManager.whiteBishop != null ? boardManager.whiteBishop : bishopPrefab;
+                case PieceType.Queen: return boardManager.whiteQueen != null ? boardManager.whiteQueen : queenPrefab;
+                case PieceType.King: return boardManager.whiteKing != null ? boardManager.whiteKing : kingPrefab;
+            }
+        }
+        else
+        {
+            switch (pieceType)
+            {
+                case PieceType.Pawn: return boardManager.blackPawn != null ? boardManager.blackPawn : capturePawnPrefab;
+                case PieceType.Rook: return boardManager.blackRook;
+                case PieceType.Knight: return boardManager.blackKnight;
+                case PieceType.Bishop: return boardManager.blackBishop;
+                case PieceType.Queen: return boardManager.blackQueen;
+                case PieceType.King: return boardManager.blackKing != null ? boardManager.blackKing : blackKingPrefab;
+            }
+        }
+
+        return null;
+    }
+
+    Vector3 GetPieceOffset(PieceType pieceType)
+    {
+        switch (pieceType)
+        {
+            case PieceType.Rook: return rookPositionOffset;
+            case PieceType.Bishop: return bishopPositionOffset;
+            case PieceType.Queen: return queenPositionOffset;
+            case PieceType.King: return kingPositionOffset;
+            case PieceType.Knight: return knightPositionOffset;
+            case PieceType.Pawn: return pawnPositionOffset;
+            default: return Vector3.zero;
+        }
+    }
+
+    bool CanCastleInTutorial(Vector2Int kingFrom, Vector2Int kingTo, bool isWhite)
+    {
+        if (boardManager?.boardPieces == null) return false;
+        if (kingFrom.x != kingTo.x || Mathf.Abs(kingTo.y - kingFrom.y) != 2) return false;
+
+        int row = kingFrom.x;
+        int rookCol = kingTo.y > kingFrom.y ? 7 : 0;
+        int step = kingTo.y > kingFrom.y ? 1 : -1;
+
+        var rook = boardManager.boardPieces[row, rookCol];
+        if (rook == null || rook.type != PieceType.Rook || rook.isWhite != isWhite || rook.hasMoved) return false;
+
+        for (int c = kingFrom.y + step; c != rookCol; c += step)
+        {
+            if (boardManager.boardPieces[row, c] != null) return false;
+        }
+
+        return true;
+    }
+
+    void MoveCastlingRook(Vector2Int kingFrom, Vector2Int kingTo, bool isWhite)
+    {
+        if (boardManager?.boardPieces == null || kingFrom.x != kingTo.x || Mathf.Abs(kingTo.y - kingFrom.y) != 2) return;
+
+        int row = kingFrom.x;
+        int rookFromCol = kingTo.y > kingFrom.y ? 7 : 0;
+        int rookToCol = kingTo.y > kingFrom.y ? kingTo.y - 1 : kingTo.y + 1;
+
+        var rookPiece = boardManager.boardPieces[row, rookFromCol];
+        if (rookPiece == null || rookPiece.type != PieceType.Rook || rookPiece.isWhite != isWhite) return;
+
+        boardManager.boardPieces[row, rookFromCol] = null;
+        boardManager.boardPieces[row, rookToCol] = rookPiece;
+        rookPiece.position = new Vector2Int(row, rookToCol);
+        rookPiece.hasMoved = true;
+
+        if (rookPiece.gameObject == null) return;
+
+        int rookIndex = row * 8 + rookToCol;
+        if (!IsValidIndex(rookIndex)) return;
+        var rookPos = squares[rookIndex].position + rookPositionOffset;
+        rookPos.y = 0f;
+        rookPiece.transform.position = rookPos;
+    }
+
+    void EnsurePieceBehavior(GameObject pieceObject, PieceType pieceType)
+    {
+        if (pieceObject == null) return;
+
+        switch (pieceType)
+        {
+            case PieceType.Rook:
+                if (pieceObject.GetComponent<RookPiece>() == null) pieceObject.AddComponent<RookPiece>();
+                break;
+            case PieceType.Bishop:
+                if (pieceObject.GetComponent<BishopPiece>() == null) pieceObject.AddComponent<BishopPiece>();
+                break;
+            case PieceType.Queen:
+                if (pieceObject.GetComponent<QueenPiece>() == null) pieceObject.AddComponent<QueenPiece>();
+                break;
+            case PieceType.King:
+                if (pieceObject.GetComponent<KingPiece>() == null) pieceObject.AddComponent<KingPiece>();
+                break;
+            case PieceType.Knight:
+                if (pieceObject.GetComponent<KnightPiece>() == null) pieceObject.AddComponent<KnightPiece>();
+                break;
+            case PieceType.Pawn:
+                if (pieceObject.GetComponent<PawnPiece>() == null) pieceObject.AddComponent<PawnPiece>();
+                break;
+        }
+    }
+
+    void InstantiateCapturePawnAtIndex(int index)
+    {
+        var capturePrefab = capturePawnPrefab != null ? capturePawnPrefab : pawnPrefab;
+        if (!IsValidIndex(index) || capturePrefab == null) return;
+
+        var pos = squares[index].position + pawnPositionOffset;
+        pos.y = 0f;
+        var pawnInstance = Instantiate(capturePrefab, pos, capturePrefab.transform.rotation);
+        pawnInstance.transform.localScale = new Vector3(32f, 32f, 32f);
+        foreach (Transform child in pawnInstance.transform)
+        {
+            child.localScale = new Vector3(32f, 32f, 32f);
+        }
+
+        var piece = pawnInstance.GetComponent<Piece>();
+        if (piece == null) piece = pawnInstance.AddComponent<Piece>();
+
+        if (pawnInstance.GetComponent<PawnPiece>() == null)
+            pawnInstance.AddComponent<PawnPiece>();
+
+        if (piece != null)
+        {
+            piece.position = new Vector2Int(index / 8, index % 8);
+            piece.isWhite = false;
+            piece.hasMoved = true;
+            piece.type = PieceType.Pawn;
+        }
+
+        if (boardManager?.boardPieces != null)
+        {
+            var existing = boardManager.boardPieces[index / 8, index % 8];
+            if (existing != null && existing != piece) boardManager.SendToSide(existing);
+            boardManager.boardPieces[index / 8, index % 8] = piece;
+        }
+
+        if (pawnInstance.GetComponent<Collider>() == null)
+        {
+            var bc = pawnInstance.AddComponent<SphereCollider>();
+            bc.radius = 0.3f;
+            bc.isTrigger = false;
+        }
+
+        _capturePawnInstances.Add(pawnInstance);
+    }
+
     int GetIndexFromTransform(Transform t)
     {
         if (t == null || squares == null || squares.Length != 64) return -1;
@@ -1491,7 +2161,7 @@ public class TutorialManager : MonoBehaviour
         return -1;
     }
 
-    void CreateHighlightsFromTransforms(Transform[] targets)
+    void CreateHighlightsLayer2FromTransforms(Transform[] targets)
     {
         if (targets == null) return;
         _tutorialTargets.Clear();
@@ -1499,27 +2169,9 @@ public class TutorialManager : MonoBehaviour
         foreach (var t in targets)
         {
             int idx = GetIndexFromTransform(t);
-            if (IsValidIndex(idx)) ShowHighlightAtIndex(idx);
-        }
-    }
-
-    void CreateHighlightsLayer2()
-    {
-        if (highlightTransformsLayer2 == null || highlightTransformsLayer2.Length == 0) return;
-        foreach (var t in highlightTransformsLayer2)
-        {
-            int idx = GetIndexFromTransform(t);
-            if (IsValidIndex(idx)) ShowHighlightAtIndexLayer2(idx);
-        }
-    }
-
-    void CreateHighlightsLayer2FromTransforms(Transform[] targets)
-    {
-        if (targets == null) return;
-        foreach (var t in targets)
-        {
-            int idx = GetIndexFromTransform(t);
-            if (IsValidIndex(idx)) ShowHighlightAtIndexLayer2(idx);
+            if (!IsValidIndex(idx)) continue;
+            _tutorialTargets.Add(idx);
+            ShowHighlightAtIndexLayer2(idx);
         }
     }
 
@@ -1560,10 +2212,7 @@ public class TutorialManager : MonoBehaviour
         }
         
         // Remove destroyed highlights from the list
-        foreach (var h in toRemove)
-        {
-            _highlights.Remove(h);
-        }
+        foreach (var h in toRemove)  _highlights.Remove(h);
     }
 
     public void ClearRook()
@@ -1662,6 +2311,54 @@ public class TutorialManager : MonoBehaviour
         _pawnInstance = null;
     }
 
+    void ClearCapturePawns()
+    {
+        if (_capturePawnInstances.Count == 0) return;
+
+        CleanupMissingCapturePawns();
+
+        foreach (var pawn in _capturePawnInstances)
+        {
+            if (pawn == null) continue;
+
+            var piece = pawn.GetComponent<Piece>();
+            if (piece != null && boardManager?.boardPieces != null)
+            {
+                var r = piece.position.x;
+                var c = piece.position.y;
+                if (r >= 0 && r < 8 && c >= 0 && c < 8 && boardManager.boardPieces[r, c] == piece)
+                    boardManager.boardPieces[r, c] = null;
+            }
+
+            Destroy(pawn);
+        }
+
+        _capturePawnInstances.Clear();
+    }
+
+    void ClearStalemateSupportPieces()
+    {
+        if (_stalemateSupportInstances.Count == 0) return;
+
+        foreach (var pieceObject in _stalemateSupportInstances)
+        {
+            if (pieceObject == null) continue;
+
+            var piece = pieceObject.GetComponent<Piece>();
+            if (piece != null && boardManager?.boardPieces != null)
+            {
+                var r = piece.position.x;
+                var c = piece.position.y;
+                if (r >= 0 && r < 8 && c >= 0 && c < 8 && boardManager.boardPieces[r, c] == piece)
+                    boardManager.boardPieces[r, c] = null;
+            }
+
+            Destroy(pieceObject);
+        }
+
+        _stalemateSupportInstances.Clear();
+    }
+
     string IndexToAlgebraic(int index)
     {
         if (!IsValidIndex(index)) return string.Empty;
@@ -1704,10 +2401,7 @@ public class TutorialManager : MonoBehaviour
             while (Piece.IsInBounds(cur))
             {
                 var p = boardManager.boardPieces[cur.x, cur.y];
-                if (p == null)
-                {
-                    moves.Add(cur);
-                }
+                if (p == null)  moves.Add(cur);
                 else
                 {
                     if (p.isWhite != isWhite) moves.Add(cur);
@@ -1730,10 +2424,7 @@ public class TutorialManager : MonoBehaviour
             while (Piece.IsInBounds(cur))
             {
                 var p = boardManager.boardPieces[cur.x, cur.y];
-                if (p == null)
-                {
-                    moves.Add(cur);
-                }
+                if (p == null)  moves.Add(cur);
                 else
                 {
                     if (p.isWhite != isWhite) moves.Add(cur);
@@ -1769,10 +2460,7 @@ public class TutorialManager : MonoBehaviour
                 if (Piece.IsInBounds(target))
                 {
                     var p = boardManager.boardPieces[target.x, target.y];
-                    if (p == null || p.isWhite != isWhite)
-                    {
-                        moves.Add(target);
-                    }
+                    if (p == null || p.isWhite != isWhite) moves.Add(target);
                 }
             }
         }
@@ -1794,10 +2482,7 @@ public class TutorialManager : MonoBehaviour
             if (Piece.IsInBounds(target))
             {
                 var p = boardManager.boardPieces[target.x, target.y];
-                if (p == null || p.isWhite != isWhite)
-                {
-                    moves.Add(target);
-                }
+                if (p == null || p.isWhite != isWhite)  moves.Add(target);
             }
         }
         return moves;
@@ -1833,22 +2518,25 @@ public class TutorialManager : MonoBehaviour
         if (Piece.IsInBounds(leftCapture))
         {
             var p = boardManager.boardPieces[leftCapture.x, leftCapture.y];
-            if (p != null && p.isWhite != isWhite)
-            {
-                moves.Add(leftCapture);
-            }
+            if (p != null && p.isWhite != isWhite) moves.Add(leftCapture);
         }
         
         Vector2Int rightCapture = new Vector2Int(pos.x + direction, pos.y + 1);
         if (Piece.IsInBounds(rightCapture))
         {
             var p = boardManager.boardPieces[rightCapture.x, rightCapture.y];
-            if (p != null && p.isWhite != isWhite)
-            {
-                moves.Add(rightCapture);
-            }
+            if (p != null && p.isWhite != isWhite) moves.Add(rightCapture);
         }
-        
+
+        // En passant
+        if (boardManager.enPassantTarget.x >= 0)
+        {
+            Vector2Int epLeft  = new Vector2Int(pos.x + direction, pos.y - 1);
+            Vector2Int epRight = new Vector2Int(pos.x + direction, pos.y + 1);
+            if (boardManager.enPassantTarget == epLeft)  moves.Add(epLeft);
+            if (boardManager.enPassantTarget == epRight) moves.Add(epRight);
+        }
+
         return moves;
     }
 }
